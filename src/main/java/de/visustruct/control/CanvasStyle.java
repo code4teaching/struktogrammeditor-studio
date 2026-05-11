@@ -11,8 +11,16 @@ import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 /**
  * Farben der Struktogramm-Zeichenfläche (nicht die Swing-Fenster).
  * Bei <b>Modern · dark</b> (FlatDark) wird eine hellere graue Fläche genutzt, passend zum dunklen UI.
+ * <p>
+ * Helles Schema: an {@code VisuStruct-SwiftUI} / {@code DiagramCanvasView} angelehnt (weiße Zellen,
+ * schwarze Kanten 2 px, blauer Auswahlrahmen).
  */
 public final class CanvasStyle {
+
+	/** Kanten von Blöcken und Hilfslinien — entspricht Swift {@code DiagramCanvasInk.diagramLineWidth}. */
+	public static final float DIAGRAM_LINE_WIDTH = 2f;
+	/** Auswahlrahmen um die aktive Kachel — entspricht Swift {@code DiagramCanvasInk.selectionLineWidth}. */
+	public static final float SELECTION_LINE_WIDTH = 3.5f;
 
 	private static Color background;
 	private static Color diagramFrame;
@@ -20,6 +28,7 @@ public final class CanvasStyle {
 	private static Color elementBorder;
 	private static Color elementText;
 	private static Color elementSelectedFill;
+	private static Color selectionStroke;
 	private static Color dropPreview;
 	private static Color dragFrame;
 	private static Color elementFill;
@@ -32,13 +41,15 @@ public final class CanvasStyle {
 	}
 
 	private static void applyLightPalette() {
+		// Canvas ~ Swift Color(white: 0.98); Rahmen/Kanten schwarz wie im Swift-Diagramm-Canvas.
 		background = new Color(0xFAFAFA);
-		diagramFrame = new Color(0xD1D5DB);
+		diagramFrame = Color.BLACK;
 		titleText = new Color(0x111827);
-		elementBorder = new Color(0x4B5563);
+		elementBorder = Color.BLACK;
 		elementText = new Color(0x111827);
-		// Markierung (hell) soll sich klar von der Drop-Vorschau unterscheiden und Text lesbar lassen.
+		// Swift: Auswahl = weiße Füllung + blauer Rand; Füllung kommt aus {@code elementFill}, Rahmen aus {@code selectionStroke}.
 		elementSelectedFill = new Color(0xDBEAFE);
+		selectionStroke = new Color(0f, 0.48f, 1f, 0.9f);
 		// Drop-Vorschau: kräftiger + halbtransparent, damit sie über Diagrammflächen nicht "klebt".
 		dropPreview = new Color(0x803B82F6, true);
 		dragFrame = new Color(0x3B82F6);
@@ -48,12 +59,12 @@ public final class CanvasStyle {
 	/** Zeichenfläche spürbar dunkler; Blöcke bleiben hell genug für Lesbarkeit. */
 	private static void applyDarkPalette() {
 		background = new Color(0x1E1E22);
-		diagramFrame = new Color(0x6B6B70);
+		diagramFrame = new Color(0xB4B4BA);
 		titleText = new Color(0xF4F4F5);
-		elementBorder = new Color(0x71717A);
+		elementBorder = new Color(0xB4B4BA);
 		elementText = new Color(0x18181B);
-		// In dark bleiben Blöcke hell; Markierung muss sich abheben, aber Text (dunkel) lesbar lassen.
 		elementSelectedFill = new Color(0xA7C7FF);
+		selectionStroke = new Color(0.35f, 0.63f, 1f, 0.92f);
 		// Drop-Vorschau: stärker + halbtransparent.
 		dropPreview = new Color(0x805B9FFF, true);
 		dragFrame = new Color(0x5B9FFF);
@@ -98,6 +109,11 @@ public final class CanvasStyle {
 
 	public static Color getElementSelectedFill() {
 		return elementSelectedFill;
+	}
+
+	/** Randfarbe für die aktuell ausgewählte Kachel (Swift: {@code selectionStrokeColor}). */
+	public static Color getSelectionStroke() {
+		return selectionStroke;
 	}
 
 	public static Color getDropPreview() {

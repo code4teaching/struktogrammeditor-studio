@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 
+import de.visustruct.i18n.StructureElementI18n;
 import de.visustruct.view.CodeErzeuger;
 import de.visustruct.view.ElementBeschriftungPresets;
 import de.visustruct.view.StruktogrammPalette;
@@ -62,23 +63,22 @@ public class GlobalSettings implements Konstanten{
 	/** Standard an: Spalten bei Verzweigung/Fallauswahl unten bündig (letztes Element wird bei Bedarf gestreckt). */
 	private static boolean letzteElementeStrecken = true;
 	/**
-	 * Standardschrift für den Struktogramm-Canvas: bevorzugt installierte Programmier-Monospace-Schriften,
-	 * sonst {@link Font#MONOSPACED}.
+	 * Standardschrift für das Struktogramm-Canvas: **Sans-Serif** (näher an VisuStruct-SwiftUI / System-UI),
+	 * mit plattformüblicher Prioritätsliste, sonst {@link Font#SANS_SERIF}.
 	 */
-	public static final Font fontStandard = createPreferredMonospaceCanvasFont(15);
+	public static final Font fontStandard = createPreferredDiagramSansFont(17);
 
-	private static Font createPreferredMonospaceCanvasFont(int size) {
+	private static Font createPreferredDiagramSansFont(int size) {
 		String[] preferred = {
-			"JetBrains Mono",
-			"JetBrains Mono NL",
-			"Cascadia Mono",
-			"Cascadia Code",
-			"SF Mono",
-			"Menlo",
-			"Monaco",
-			"Consolas",
-			"DejaVu Sans Mono",
-			"Liberation Mono",
+			"Segoe UI",
+			"SF Pro Text",
+			"Helvetica Neue",
+			"Lucida Grande",
+			"Roboto",
+			"Ubuntu",
+			"Noto Sans",
+			"DejaVu Sans",
+			"Arial",
 		};
 		try {
 			Set<String> installed = new HashSet<>(Arrays.asList(
@@ -91,7 +91,7 @@ public class GlobalSettings implements Konstanten{
 		} catch (RuntimeException ignored) {
 			// Headless o. Ä. → Fallback
 		}
-		return new Font(Font.MONOSPACED, PLAIN, size);
+		return new Font(Font.SANS_SERIF, PLAIN, size);
 	}
 	private static final String einstellungsDateiPfad = "visustruct.properties";
 	private static final String einstellungsDateiPfadLegacy = "struktogrammeditor.properties";
@@ -429,14 +429,14 @@ public class GlobalSettings implements Konstanten{
 	}
 
 	/**
-	 * Text auf der linken Palette: bei Java-Standard Schlüsselwörter ({@code if}, {@code while}, …),
-	 * sonst wie {@link #gibElementBeschriftung(int)}.
+	 * Text auf der linken Palette: bei Preset <b>Java (Standard)</b> syntaxnahe Kurzformen ({@code if}, {@code while}, …),
+	 * sonst kurze didaktische Namen gemäß <b>UI-Sprache</b> ({@code structure.palette.*}).
 	 */
 	public static String gibPaletteButtonBeschriftung(int typNummer) {
 		if (elementBeschriftungPresetIndex == ElementBeschriftungPresets.PRESET_ENGLISH_JAVA) {
 			return ElementBeschriftungPresets.javaStandardPaletteButtonLabel(typNummer);
 		}
-		return gibElementBeschriftung(typNummer);
+		return StructureElementI18n.paletteShortLabel(typNummer);
 	}
 
 	public static int getElementBeschriftungPresetIndex() {

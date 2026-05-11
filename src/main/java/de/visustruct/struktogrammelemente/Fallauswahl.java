@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import org.jdom2.Element;
 
 import de.visustruct.control.CanvasStyle;
+import de.visustruct.control.DiagramKeywordText;
 import de.visustruct.control.GlobalSettings;
 import de.visustruct.control.Struktogramm;
 import de.visustruct.control.XMLLeser;
@@ -374,14 +375,15 @@ public class Fallauswahl extends StruktogrammElement { //erbt von StruktogrammEl
 				if (i==0){
 					x = gibX() + 5; //5 Pixel von linken Rand entfernt
 				}else{
-					x = tmp.gibRechterRand() - 5 - gibTextbreite(tmp.gibBeschreibung()); //5 Pixel vom rechten Rand entfernt
+					x = tmp.gibRechterRand() - 5 - DiagramKeywordText.measureLineWidth(g, tmp.gibBeschreibung()); //5 Pixel vom rechten Rand entfernt
 				}
 			}else{ //bei der Fallauswahl sollen die Überschriften mittig über den Zeilen stehen
-				x = tmp.gibX() + gibXVerschiebungFuerMittig(tmp.gibBeschreibung(), tmp.gibRechterRand() -tmp.gibX());
+				int colW = tmp.gibRechterRand() - tmp.gibX();
+				String lab = tmp.gibBeschreibung();
+				x = tmp.gibX() + (int) ((colW - DiagramKeywordText.measureLineWidth(g, lab)) / 2);
 			}
 
-			g.setColor(getFarbeSchrift());
-			g.drawString(tmp.gibBeschreibung(), x, gibY() + getObererRand() - 5); //Beschreibung zeichnen
+			DiagramKeywordText.drawKeywordAwareLine(g, getFarbeSchrift(), x, gibY() + getObererRand() - 5, tmp.gibBeschreibung());
 		}
 
 

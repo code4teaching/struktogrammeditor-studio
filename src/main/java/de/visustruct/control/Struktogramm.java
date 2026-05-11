@@ -89,8 +89,11 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	//private JScrollPane scrollpane; //in diesem JScrollPane liegt das Struktogramm, scrollpane liegt wiederrum in einem JTabbedPane (siehe GUI)
 	private StrTabbedPane tabbedpane; //für eine kennt-Beziehung mit dem JTabbedPane
 	private Dimension dimGroesse; //Ausmaße des Struktogramms
-	private static final int randLinks = 20; //Verschiebung der StruktogrammElemente nach rechts
-	private static final int randOben = 20;  //Verschiebung der StruktogrammElemente nach unten
+	/** Entspricht Swift {@code VisuStructLayoutEngine.layout}(…, topLeadingContentInset: (28, 28)). */
+	private static final int randLinks = 28;
+	private static final int randOben = 28;
+	/** Entspricht Swift {@code DiagramCanvasInk.canvasOuterMargin} / Außenrahmen-Inset. */
+	private static final int diagramOuterMargin = 16;
 	/** Zusätzlicher horizontaler Rand links/rechts, damit die Diagramm-Überschrift (20 pt) nicht abgeschnitten wird. */
 	private static final int captionRandHorizontal = 24;
 	private DragSource dragSource; //benötigt zum Auslösen eines Drag
@@ -297,6 +300,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 			//g.setFont(new Font("serif", Font.PLAIN, 15)); //Schriftart für die StruktogrammElemente setzen
 			g.setFont(fontStr);
+			g.setStroke(new BasicStroke(CanvasStyle.DIAGRAM_LINE_WIDTH));
 			liste.graphicsAllerUnterlementeSetzen(g); //g an alle StruktogrammElemente weitergeben
 
 			return true;
@@ -343,9 +347,16 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 				g.setFont(f);
 			}
 
-			// Außenrahmen immer (früher nur mit Diagramm-Beschriftung — wirkte ohne Caption / im Dark-Mode wie „ohne Rahmen“)
-			g.setColor(CanvasStyle.getDiagramFrame());
-			g.drawRect(10, 10, dimGroesse.width - 21, dimGroesse.height - 21);
+			// Außenrahmen — wie Swift: schwarz 2 px, Inset 16 (DiagramCanvasView).
+			Stroke frameStrokeAlt = g.getStroke();
+			try {
+				g.setStroke(new BasicStroke(CanvasStyle.DIAGRAM_LINE_WIDTH));
+				g.setColor(CanvasStyle.getDiagramFrame());
+				int m = diagramOuterMargin;
+				g.drawRect(m, m, dimGroesse.width - 2 * m, dimGroesse.height - 2 * m);
+			} finally {
+				g.setStroke(frameStrokeAlt);
+			}
 
 			//alle StruktogrammElemente zeichnen
 			liste.alleZeichnen();

@@ -1,7 +1,10 @@
 package de.visustruct.struktogrammelemente;
 
+import java.awt.Font;
 import java.awt.Graphics2D;
 
+import de.visustruct.control.CanvasStyle;
+import de.visustruct.control.DiagramKeywordText;
 import de.visustruct.control.GlobalSettings;
 import de.visustruct.control.Struktogramm;
 import de.visustruct.other.JTextAreaEasy;
@@ -15,6 +18,57 @@ public class DoUntilSchleife extends Schleife {//erbt von Schleife
       setzeText(GlobalSettings.gibElementBeschriftung(Struktogramm.typDoUntilSchleife));
    }
    
+	/**
+	 * Mehr linker Einzug als bei anderen Schleifen: Platz für fettes „do“ ohne Überlappung
+	 * mit der senkrechten Rumpfkante (2px-Strich).
+	 */
+	@Override
+	protected int gibSchleifenLinkenRandInnen() {
+		return 44;
+	}
+
+	/** Abstand vom Kastenstrich zur Außenkante; verhindert Überlappung mit dem 2px-Rahmen. */
+	private static final int DO_LABEL_PAD_AUSSEN = 6;
+	/** Freiraum zwischen rechtem Rand von „do“ und der Rumpf-Linie (inkl. halber Strichbreite). */
+	private static final int DO_LABEL_PAD_VOR_RUMPF = 10;
+
+	@Override
+	public void zeichne() {
+		super.zeichne();
+		zeichneDoObenLinks();
+	}
+
+	/**
+	 * „do“ im linken Streifen zwischen Außenkante und Rumpf — mit Abstand zu Rahmen und senkrechter Rumpfkante.
+	 */
+	private void zeichneDoObenLinks() {
+		if (!objGesetzt(g)) {
+			return;
+		}
+		int stroke = (int) Math.ceil(CanvasStyle.DIAGRAM_LINE_WIDTH);
+		int gutterLeft = gibX() + stroke + DO_LABEL_PAD_AUSSEN;
+		int innerBodyLeft = gibX() + gibSchleifenLinkenRandInnen();
+		int halfStroke = (int) Math.ceil(CanvasStyle.DIAGRAM_LINE_WIDTH / 2f);
+		int gutterRight = innerBodyLeft - halfStroke - DO_LABEL_PAD_VOR_RUMPF;
+		if (gutterRight <= gutterLeft) {
+			gutterRight = gutterLeft + 1;
+		}
+		Font saved = g.getFont();
+		try {
+			g.setFont(saved.deriveFont(Font.BOLD));
+			int doWide = DiagramKeywordText.measureLineWidth(g, "do");
+			int x = gutterLeft;
+			if (doWide < gutterRight - gutterLeft) {
+				x = gutterLeft + (gutterRight - gutterLeft - doWide) / 2;
+			}
+			int ascent = g.getFontMetrics().getAscent();
+			int y = gibY() + stroke + DO_LABEL_PAD_AUSSEN + ascent;
+			DiagramKeywordText.drawKeywordAwareLine(g, getFarbeSchrift(), x, y, "do");
+		} finally {
+			g.setFont(saved);
+		}
+	}
+
    
    
    @Override
@@ -22,11 +76,12 @@ public class DoUntilSchleife extends Schleife {//erbt von Schleife
       int texthoehe = gibTexthoehe(text[0]);
       int yVerschiebungAktuell = gibHoehe() -15; //Position der untersten Zeile: 15 Pixel über dem unteren Rand
 
-      g.setColor(getFarbeSchrift());
-      
-      //Textzeilen werden von unten nach oben gezeichnet (von der Letzten bis zur Ersten)
-      for (int i=text.length -1; i >= 0; i--){
-         g.drawString(text[i], gibX() + gibXVerschiebungFuerTextInMitte(text[i]), gibY() + yVerschiebungAktuell);
+      int typ = Struktogramm.typDoUntilSchleife;
+      // Textzeilen von unten nach oben; pro Zeile gleicher Index wie im Text-Array (für while/until-Normalisierung).
+      for (int i = text.length - 1; i >= 0; i--) {
+         String display = DiagramKeywordText.lineForDisplay(typ, i, text[i]);
+         int x = gibX() + gibXVerschiebungFuerTextInMitte(i, display);
+         DiagramKeywordText.drawKeywordAwareLine(g, getFarbeSchrift(), x, gibY() + yVerschiebungAktuell, display);
          yVerschiebungAktuell -= texthoehe;
       }
    }

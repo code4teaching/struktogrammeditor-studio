@@ -8,8 +8,14 @@ import org.jdom2.Element;
 
 public abstract class Schleife extends StruktogrammElement { //abstrakte Klasse -> kann nicht erzeugt werden; erbt von Struktogrammelement
 	protected StruktogrammElementListe liste; //Liste mit den innerhalb der Schleife befindlichen StruktogrammElementen
-	private static final int linkerRand = 20;
+	/** Standard linker Einzug des Schleifen-Rumpfs (px). */
+	protected static final int SCHLEIFEN_LINKER_INNEN_RAND = 20;
 	private int untererRand;
+
+	/** Linker Rand bis zum Rumpf — {@link DoUntilSchleife} liefert mehr Platz für „do“. */
+	protected int gibSchleifenLinkenRandInnen() {
+		return SCHLEIFEN_LINKER_INNEN_RAND;
+	}
 
 
 	public Schleife(Graphics2D g){
@@ -56,9 +62,9 @@ public abstract class Schleife extends StruktogrammElement { //abstrakte Klasse 
 	@Override
 	public void setzeBreite(int neueBreite){
 
-		liste.breiteDerUnterelementeSetzen(neueBreite - linkerRand);
+		liste.breiteDerUnterelementeSetzen(neueBreite - gibSchleifenLinkenRandInnen());
 
-		liste.xPosAllerUnterelementeSetzen(gibX() + linkerRand);
+		liste.xPosAllerUnterelementeSetzen(gibX() + gibSchleifenLinkenRandInnen());
 
 		bereich.width = neueBreite;
 	}
@@ -118,7 +124,7 @@ public abstract class Schleife extends StruktogrammElement { //abstrakte Klasse 
 	@Override
 	public Rectangle zeichenbereichAktualisieren(int x, int y){
 
-		Rectangle rectListe = liste.zeichenbereichAllerElementeAktualisieren(x + linkerRand, y + getObererRand() + (! (this instanceof DoUntilSchleife) ? 0/*getYVergroesserung()*/ : 0));//Zeichenbereich der Liste aktualisieren
+		Rectangle rectListe = liste.zeichenbereichAllerElementeAktualisieren(x + gibSchleifenLinkenRandInnen(), y + getObererRand() + (! (this instanceof DoUntilSchleife) ? 0/*getYVergroesserung()*/ : 0));//Zeichenbereich der Liste aktualisieren
 
 
 		int gesamtbreite;
@@ -129,7 +135,7 @@ public abstract class Schleife extends StruktogrammElement { //abstrakte Klasse 
 			gesamtbreite = gibMindestbreite();//...wenn nicht, dann Mindestbreite als Gesamtbreite nehmen
 		}
 
-		gesamtbreite += linkerRand;//linken Rand dazunehmen
+		gesamtbreite += gibSchleifenLinkenRandInnen();//linken Rand dazunehmen
 
 
 		bereich.setBounds(x, y, gesamtbreite, getObererRand() + getUntererRand() + rectListe.height);//Bereich speichern
@@ -147,7 +153,7 @@ public abstract class Schleife extends StruktogrammElement { //abstrakte Klasse 
 	public void setzeXPos(int x){
 		bereich.x = x;
 
-		liste.xPosAllerUnterelementeSetzen(x + linkerRand);
+		liste.xPosAllerUnterelementeSetzen(x + gibSchleifenLinkenRandInnen());
 	}
 	
 	

@@ -1,12 +1,15 @@
 package de.visustruct.struktogrammelemente;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Stroke;
 
 import org.jdom2.Element;
 
 import de.visustruct.control.CanvasStyle;
+import de.visustruct.control.DiagramKeywordText;
 import de.visustruct.control.Struktogramm;
 import de.visustruct.control.XMLLeser;
 import de.visustruct.other.JTextAreaEasy;
@@ -15,7 +18,7 @@ import de.visustruct.view.CodeErzeuger;
 public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte davon erzeugbar
 	protected String[] text; //Textzeilen, die im Kopfbereich des jeweiligen StruktogrammElementes angzeigt werden
 	protected Rectangle bereich; //Koordinaten, Breite und Hoehe des jeweiligen StruktogrammElemente
-	protected boolean markiert; //speichert, ob dieses StruktogrammElement gelb unterlegt gezeichnet werden soll
+	protected boolean markiert; // aktive Kachel: wie SwiftUI blauer Rand (ohne Blaufüllung)
 	protected Graphics2D g; //Graphics-Kontext des BufferedImage bild des Struktogramms
 	protected static final int vorschauHoehe = 20; //Höhe des roten Vorschau-Rechteckes
 	private int obererRand; //verändert sich je nach Anzahl der Textzeilen
@@ -262,16 +265,20 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 
 
 	protected int gibBreiteDerBreitestenTextzeile(){
+		int typ = Struktogramm.strElementZuTypnummer(this);
 		int groessteBreite = 0;
-		int breite;
-
-		for (String s : text){//text-Array durchgehen
-			breite = gibTextbreite(s);
-			if (breite > groessteBreite){
+		for (int i = 0; i < text.length; i++) {
+			String display = DiagramKeywordText.lineForDisplay(typ, i, text[i]);
+			int breite;
+			if (objGesetzt(g)) {
+				breite = DiagramKeywordText.measureLineWidth(g, display);
+			} else {
+				breite = Math.max(display.length() * 7, 4 * display.length());
+			}
+			if (breite > groessteBreite) {
 				groessteBreite = breite;
 			}
 		}
-
 		return groessteBreite;
 	}
 
@@ -327,25 +334,33 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 	protected void textZeichnen(){
 		int texthoehe = gibTexthoehe(text[0]);
 		int yVerschiebungAktuell = texthoehe - 5;
-		
-		g.setColor(getFarbeSchrift());
 
-		for (String s : text){
-			g.drawString(s, gibX() + gibXVerschiebungFuerTextInMitte(s), gibY() + yVerschiebungAktuell);//Textzeilen untereinander zeichnen
+		int typ = Struktogramm.strElementZuTypnummer(this);
+		for (int i = 0; i < text.length; i++) {
+			String display = DiagramKeywordText.lineForDisplay(typ, i, text[i]);
+			int x = gibX() + gibXVerschiebungFuerTextInMitte(i, display);
+			DiagramKeywordText.drawKeywordAwareLine(g, getFarbeSchrift(), x, gibY() + yVerschiebungAktuell, display);
 			yVerschiebungAktuell += texthoehe;
 		}
 	}
 
 
 	protected void eigenenBereichZeichnen(){
-		if (!markiert){
-			g.setColor(getFarbeHintergrund());//für Rechteck mit eingestellter Farbe
-		}else{
-			g.setColor(CanvasStyle.getElementSelectedFill());
+		Stroke alt = g.getStroke();
+		try {
+			g.setStroke(new BasicStroke(CanvasStyle.DIAGRAM_LINE_WIDTH));
+			g.setColor(getFarbeHintergrund());
+			g.fillRect(gibX(), gibY(), gibBreite(), gibHoehe());
+			g.setColor(CanvasStyle.getElementBorder());
+			g.drawRect(gibX(), gibY(), gibBreite(), gibHoehe());
+			if (markiert) {
+				g.setStroke(new BasicStroke(CanvasStyle.SELECTION_LINE_WIDTH));
+				g.setColor(CanvasStyle.getSelectionStroke());
+				g.drawRect(gibX(), gibY(), gibBreite(), gibHoehe());
+			}
+		} finally {
+			g.setStroke(alt);
 		}
-		g.fillRect(gibX(), gibY(), gibBreite(), gibHoehe());//ausgefülltes Rechteck zeichnen
-		g.setColor(CanvasStyle.getElementBorder());
-		g.drawRect(gibX(), gibY(), gibBreite(), gibHoehe());
 	}
 
 	protected int gibX(){
@@ -387,8 +402,18 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 	}
 
 
-	protected int gibXVerschiebungFuerTextInMitte(String textzeile){
-		return gibXVerschiebungFuerMittig(textzeile, gibBreite());
+	protected int gibXVerschiebungFuerTextInMitte(int lineIndex, String displayLine){
+		if (!objGesetzt(g)) {
+			return (int) ((gibBreite() - displayLine.length() * 7) / 2);
+		}
+		return (int) ((gibBreite() - DiagramKeywordText.measureLineWidth(g, displayLine)) / 2);
+	}
+
+	/** Zentriert eine Anzeigezeile (Rohzeile Zeile 0: führendes Keyword wie in Swift). */
+	protected int gibXVerschiebungFuerTextInMitte(String rawEineZeile){
+		int typ = Struktogramm.strElementZuTypnummer(this);
+		String display = DiagramKeywordText.lineForDisplay(typ, 0, rawEineZeile);
+		return gibXVerschiebungFuerTextInMitte(0, display);
 	}
 
 	//gibt die x-Verschiebung zurück, damit der Text s mittig in einem Bereich der Breite breiteUntergrund dargestellt wird

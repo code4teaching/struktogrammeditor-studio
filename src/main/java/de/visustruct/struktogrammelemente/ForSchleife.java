@@ -2,6 +2,7 @@ package de.visustruct.struktogrammelemente;
 
 import java.awt.Graphics2D;
 
+import de.visustruct.control.DiagramKeywordText;
 import de.visustruct.control.GlobalSettings;
 import de.visustruct.control.Struktogramm;
 import de.visustruct.other.JTextAreaEasy;
@@ -28,7 +29,11 @@ public class ForSchleife extends WhileSchleife { //erbt von WhileSchleife
    @Override
    protected int gibBreiteDerBreitestenTextzeile(){
       if (hatMehrteiligenKopf()){
-         return gibTextbreite(gibKopfText());
+         String display = DiagramKeywordText.lineForDisplay(Struktogramm.typForSchleife, 0, gibKopfText());
+         if (objGesetzt(g)) {
+            return DiagramKeywordText.measureLineWidth(g, display);
+         }
+         return Math.max(display.length() * 7, 4 * display.length());
       }
 
       return super.gibBreiteDerBreitestenTextzeile();
@@ -44,8 +49,9 @@ public class ForSchleife extends WhileSchleife { //erbt von WhileSchleife
       String kopfText = gibKopfText();
       int texthoehe = gibTexthoehe(text[0]);
 
-      g.setColor(getFarbeSchrift());
-      g.drawString(kopfText, gibX() + gibXVerschiebungFuerTextInMitte(kopfText), gibY() + texthoehe - 5);
+      String display = DiagramKeywordText.lineForDisplay(Struktogramm.typForSchleife, 0, kopfText);
+      int x = gibX() + gibXVerschiebungFuerTextInMitte(0, display);
+      DiagramKeywordText.drawKeywordAwareLine(g, getFarbeSchrift(), x, gibY() + texthoehe - 5, display);
    }
 
    private boolean hatMehrteiligenKopf(){
