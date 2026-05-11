@@ -16,7 +16,6 @@ import de.visustruct.view.CodeErzeuger;
 import de.visustruct.other.JTextAreaEasy;
 
 public class Fallauswahl extends StruktogrammElement { //erbt von StruktogrammElement
-	//private Struktogramm str; //wird in hier gebraucht, um auf die Einstellung zugreifen zu können, ob die letzten Elemente bei Bedarf gestreckt werden sollen
 	protected int xVerschiebungFuerTrennlinie; //legt fest, wie weit vom linken Rand der Fallauswahl die Trennlinie zwischen Vorletztem- und Sonst-Fall sein soll
 	protected int yVerschiebungFuerTrennLinie; //legt fest, wie hoch die oben genannte Trennlinie sein soll
 	protected ArrayList<StruktogrammElementListe> listen; //Liste von StruktogrammElementListen, für die einzelnen Fälle; als Generische ArrayList: http://www.theserverside.de/java-generics-generische-methoden-klassen-und-interfaces/
@@ -28,8 +27,6 @@ public class Fallauswahl extends StruktogrammElement { //erbt von StruktogrammEl
 
 	public Fallauswahl(Graphics2D g, int anzahlListen){
 		super(g);
-
-		//this.str = str;
 
 		erstelleNeueListen(anzahlListen);
 
@@ -411,6 +408,10 @@ public class Fallauswahl extends StruktogrammElement { //erbt von StruktogrammEl
 			}
 		}
 
+		if (this instanceof Verzweigung && listen.size() == 2) {
+			gesamtbreiteDerListen = verzweigungJaNeinMindestbreiten(x, gesamtbreiteDerListen);
+		}
+
 
 
 		xVerschiebungFuerTrennlinie = gesamtbreiteDerListen - listen.get(listen.size()-1).gibBreite(); //xVerschiebung der Trennlinie ist Breite der Listen minus Breite der Sonst-Liste
@@ -432,6 +433,39 @@ public class Fallauswahl extends StruktogrammElement { //erbt von StruktogrammEl
 		
 
 		return bereich;
+	}
+
+	/**
+	 * Verzweigung: linker „true“-Zweig mindestens so breit wie Beschriftung + Rand zur Diagonalen;
+	 * der „false“-Zweig wird schmaler oder die Gesamtbreite wächst.
+	 *
+	 * @return neue Summe der Spaltenbreiten
+	 */
+	private int verzweigungJaNeinMindestbreiten(int fallAuswahlX, int gesamtBreite) {
+		StruktogrammElementListe links = listen.get(0);
+		StruktogrammElementListe rechts = listen.get(listen.size() - 1);
+		int wLinks = links.gibBreite();
+		int wRechts = rechts.gibBreite();
+		final int randLinks = 28;
+		final int randRechts = 20;
+		int minLinks = links.breiteFuerBeschriftungMitRand(randLinks);
+		int minRechts = rechts.breiteFuerBeschriftungMitRand(randRechts);
+		if (wLinks >= minLinks) {
+			return gesamtBreite;
+		}
+		int fehlend = minLinks - wLinks;
+		int wRechtsNeu = wRechts - fehlend;
+		if (wRechtsNeu < minRechts) {
+			wLinks = minLinks;
+			wRechtsNeu = minRechts;
+		} else {
+			wLinks = minLinks;
+		}
+		links.breiteDerUnterelementeSetzen(wLinks);
+		rechts.breiteDerUnterelementeSetzen(wRechtsNeu);
+		links.xPosAllerUnterelementeSetzen(fallAuswahlX);
+		rechts.xPosAllerUnterelementeSetzen(fallAuswahlX + wLinks);
+		return wLinks + wRechtsNeu;
 	}
 
 

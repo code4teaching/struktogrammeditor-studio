@@ -7,7 +7,7 @@ public enum XActionCommands {
 	rueckgaengig, widerrufen, ganzesStruktogrammKopieren,
 	
 	letztesElementStrecken, schriftartAendern,
-	groesseAendernMitMausrad, zoomeinstellungen, vergroesserungenRuckgaengigMachen,
+	zoomeinstellungen, vergroesserungenRuckgaengigMachen,
 	elementShortcutsVerwenden,
 
 	/** Dialog „Beschriftung (Struktogramm)“ / Textvorlagen für neue Blöcke. */

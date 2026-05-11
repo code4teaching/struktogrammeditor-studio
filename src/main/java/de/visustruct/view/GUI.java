@@ -2,17 +2,27 @@ package de.visustruct.view;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.io.File;
 
+import java.util.List;
+
+import javax.swing.AbstractAction;
+import javax.swing.ActionMap;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
+import javax.swing.InputMap;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JRadioButtonMenuItem;
+import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
@@ -22,6 +32,7 @@ import javax.swing.WindowConstants;
 import de.visustruct.control.Controlling;
 import de.visustruct.control.GlobalSettings;
 import de.visustruct.control.Konstanten;
+import de.visustruct.control.Struktogramm;
 import de.visustruct.i18n.I18n;
 import de.visustruct.other.XActionCommands;
 
@@ -95,6 +106,8 @@ public class GUI extends JFrame implements Konstanten{
 		buildMenuBar();
 		setJMenuBar(menubar);
 
+		installRootPaneCanvasZoomShortcuts();
+
 		// Kein fullWindowContent / transparentTitleBar auf macOS: führt unter FlatLaf + aktuellem JDK
 		// oft zu grauem, nicht bedienbarem Client-Bereich (Fensterinhalt wird nicht korrekt gezeichnet).
 
@@ -124,6 +137,7 @@ public class GUI extends JFrame implements Konstanten{
 		{
 			menu.add(createMenuItem(I18n.tr("menu.file.new"), XActionCommands.neu, KeyEvent.VK_N, KeyEvent.VK_N));
 			menu.add(createMenuItem(I18n.tr("menu.file.open"), XActionCommands.oeffnen, KeyEvent.VK_O, KeyEvent.VK_O));
+			appendRecentDiagramSubmenu(menu);
 			menu.add(new JSeparator());
 			menu.add(createMenuItem(I18n.tr("menu.file.save"), XActionCommands.speichern, KeyEvent.VK_S, KeyEvent.VK_S));
 			menu.add(createMenuItem(I18n.tr("menu.file.saveAs"), XActionCommands.speicherUnter, KeyEvent.VK_A));
@@ -236,7 +250,6 @@ public class GUI extends JFrame implements Konstanten{
 			menu.add(createMenuItem(I18n.tr("menu.settings.labelsStruktogramm"), XActionCommands.elementBeschriftungEinstellen, KeyEvent.VK_B));
 			menu.add(createMenuItem(I18n.tr("menu.settings.changeFont"), XActionCommands.schriftartAendern, KeyEvent.VK_F));
 			menu.add(new JSeparator());
-			menu.add(createMenuItem(I18n.tr("menu.settings.mouseWheel"), XActionCommands.groesseAendernMitMausrad, KeyEvent.VK_M, GlobalSettings.isBeiMausradGroesseAendern()));
 			menu.add(createMenuItem(I18n.tr("menu.settings.zoom"), XActionCommands.zoomeinstellungen, KeyEvent.VK_Z));
 			menu.add(createMenuItem(I18n.tr("menu.settings.resetSizes"), XActionCommands.vergroesserungenRuckgaengigMachen, KeyEvent.VK_R));
 			menu.add(new JSeparator());
@@ -293,6 +306,43 @@ public class GUI extends JFrame implements Konstanten{
 		return menuitem;
 	}
 
+	/** Untermenü „Zuletzt geöffnet“ unter Datei. */
+	private void appendRecentDiagramSubmenu(JMenu fileMenu) {
+		JMenu recent = createMenu(I18n.tr("menu.file.openRecent"), KeyEvent.VK_T);
+		List<String> paths = GlobalSettings.getRecentDiagramPaths();
+		if (paths.isEmpty()) {
+			JMenuItem empty = new JMenuItem(I18n.tr("menu.file.openRecent.empty"));
+			empty.setEnabled(false);
+			recent.add(empty);
+		} else {
+			for (String fullPath : paths) {
+				JMenuItem it = new JMenuItem(formatRecentMenuLabel(fullPath));
+				it.setToolTipText(fullPath);
+				final String fp = fullPath;
+				it.addActionListener(ev -> controlling.oeffneStruktogrammAusZuletztListe(fp));
+				recent.add(it);
+			}
+		}
+		fileMenu.add(recent);
+	}
+
+	private static String formatRecentMenuLabel(String fullPath) {
+		File f = new File(fullPath);
+		String name = f.getName();
+		if (name.isEmpty()) {
+			return fullPath;
+		}
+		String par = f.getParent();
+		if (par == null || par.isEmpty()) {
+			return name;
+		}
+		final int maxParent = 48;
+		if (par.length() > maxParent) {
+			par = "\u2026" + par.substring(par.length() - (maxParent - 1));
+		}
+		return name + " \u2014 " + par;
+	}
+
 
 	public StrTabbedPane gibTabbedpane(){
 		return tabbedpane;
@@ -310,6 +360,41 @@ public class GUI extends JFrame implements Konstanten{
 
 	public JMenuBar getMenubar() {
 		return menubar;
+	}
+
+	/**
+	 * Ansichts-Zoom für das aktive Diagramm: ⌘+ / ⌘− (macOS) bzw. Strg+ / Strg− (Windows/Linux),
+	 * solange das Hauptfenster fokussiert ist.
+	 */
+	private void installRootPaneCanvasZoomShortcuts() {
+		int m = GlobalSettings.strgOderApfelMask;
+		JRootPane root = getRootPane();
+		InputMap im = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+		ActionMap am = root.getActionMap();
+		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, m), "visuCanvasZoomIn");
+		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_PLUS, m), "visuCanvasZoomIn");
+		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ADD, m), "visuCanvasZoomIn");
+		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, m | InputEvent.SHIFT_DOWN_MASK), "visuCanvasZoomIn");
+		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, m), "visuCanvasZoomOut");
+		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_SUBTRACT, m), "visuCanvasZoomOut");
+		am.put("visuCanvasZoomIn", new AbstractAction() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Struktogramm s = controlling.gibAktuellesStruktogramm();
+				if (s != null) {
+					s.canvasZoomIn();
+				}
+			}
+		});
+		am.put("visuCanvasZoomOut", new AbstractAction() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Struktogramm s = controlling.gibAktuellesStruktogramm();
+				if (s != null) {
+					s.canvasZoomOut();
+				}
+			}
+		});
 	}
 
 }

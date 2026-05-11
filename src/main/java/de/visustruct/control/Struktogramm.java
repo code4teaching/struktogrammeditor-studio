@@ -28,8 +28,6 @@ import java.awt.dnd.DropTargetListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -38,6 +36,8 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
@@ -70,25 +70,30 @@ import de.visustruct.view.StrTabbedPane;
 import de.visustruct.view.StruktogrammPopup;
 
 
-public class Struktogramm extends JPanel implements MouseListener, MouseMotionListener, MouseWheelListener, DropTargetListener/*zum Empfangen von Drop*/, DragGestureListener, DragSourceListener /*letzten Beiden sind zum Auslösen von Drags*/{
+public class Struktogramm extends JPanel implements MouseListener, MouseMotionListener, DropTargetListener/*zum Empfangen von Drop*/, DragGestureListener, DragSourceListener /*letzten Beiden sind zum Auslösen von Drags*/{
+
+	private static final Logger LOG = Logger.getLogger(Struktogramm.class.getName());
 
 	private static final long serialVersionUID = 8269048981647964473L;
 	private StruktogrammElementListe liste; //Hauptliste, die alle weiteren Unterelemente hat
 	private Graphics2D g; //Graphics des BufferedImage bild
-	//private Graphics2D panelGraphics; //Graphics-Kontext des Struktogramms (es erbt von JPanel)
 	private StruktogrammElement markiertesElement; //das mit der Maus markierte Element
 	private BufferedImage bild; //hierauf zeichnen sich die StruktogrammElemente, anschließend wird alles auf das Struktogramm (also das JPanel) gezeichnet -> DoubleBuffering
 	private int sperre = 0; //laufender int-Wert für entlasten der CPU (siehe auch nächste Zeile und mausBewegt(...))
-	private static final int sperreAktualisierung = 0;//10;//war gedacht, zum mindern der CPU-Last, weil MouseMoved sehr oft ausgelöst wurde; es wird nur alle sperreAktualisierung+1 Mal neu gezeichnet
+	private static final int sperreAktualisierung = 0; // früher z. B. 10: seltener neuzeichnen bei MouseMoved (CPU); aktuell jedes Mal
 	private boolean popupmenuSichtbar = false;
 	/** Zuletzt bekannte Mausposition auf der Zeichenfläche (für Einfügen, wenn der Zeiger schon in Menüleiste etc. ist). */
 	private Point letzteDiagrammMausKoords;
 	/** Festes Ziel nach einem Klick in den Canvas; bleibt erhalten, während die Maus zur Palette wandert. */
 	private Point ausgewaehlteEinfuegeKoords;
 	private Rectangle ausgewaehlteEinfuegeMarkierung;
-	//private JScrollPane scrollpane; //in diesem JScrollPane liegt das Struktogramm, scrollpane liegt wiederrum in einem JTabbedPane (siehe GUI)
 	private StrTabbedPane tabbedpane; //für eine kennt-Beziehung mit dem JTabbedPane
 	private Dimension dimGroesse; //Ausmaße des Struktogramms
+	/** Skalierung der Diagramm-Ansicht (⌘+/⌘−); Block-Größen bleiben in Pixel-Logik unverändert. */
+	private static final double CANVAS_ZOOM_MIN = 0.4;
+	private static final double CANVAS_ZOOM_MAX = 2.8;
+	private static final double CANVAS_ZOOM_STEP = 1.12;
+	private double canvasViewScale = 1.0;
 	/** Entspricht Swift {@code VisuStructLayoutEngine.layout}(…, topLeadingContentInset: (28, 28)). */
 	private static final int randLinks = 28;
 	private static final int randOben = 28;
@@ -97,7 +102,6 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	/** Zusätzlicher horizontaler Rand links/rechts, damit die Diagramm-Überschrift (20 pt) nicht abgeschnitten wird. */
 	private static final int captionRandHorizontal = 24;
 	private DragSource dragSource; //benötigt zum Auslösen eines Drag
-	//private DropTarget dropTarget; //benötigt zum Empfangen eines Drop
 	private StruktogrammPopup popup; //Popup-Kontextmenü bei Rechtsklick
 	private StruktogrammElement dragZwischenlagerElement; //wenn ein Element aus dem bestehenden Struktogramm gezogen wird (Drag), wird es in dragZwischenlagerElement gespeichert
 	private StruktogrammElementListe dragZwischenlagerListe; //die dragZwischenlagerElement übergeordnete StruktogrammElementListe
@@ -105,10 +109,9 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	private String aktuellerSpeicherpfad; //der absolute Pfad, wo dieses Struktogramm gespeichert wurde, oder von wo es geladen wurde
 	/** Ohne gesetzten Speicherpfad: Basisname für den Speichern-unter-Dialog (z. B. nach Tab-Umbenennung). */
 	private String vorgeschlagenerSpeicherBasisname = "";
-	//private boolean ueberwacheResize = false; //speichert, ob das Struktogramm auf Größenveränderungen der GUI reagieren soll; der Wert wird von der GUI gesetzt
 	private ArrayList<Document> rueckgaengigListe; //Liste mit Document-Objekte, in denen jeweils ein komplettes Struktogramm gespeichert ist; nach jeder Veränderung wird ein neues Abbild des Struktogramms in die Liste abgelegt, für die Rückgängig-Funktion
 	private int posInRueckgaengigListe = 0; //aktueller Index, an welcher Stelle man sich in der Rückgängig-Liste befindet; meist ist der Wert der letzte Index der Rückgängig-Liste, außer man hat auf Rückgängig geklickt
-	private int posInRueckgaengigListeWoZuletztGespeichert = -1; //Index, in der Rückgängig-Liste bei dem zuletzt gespeichert wurde; wird benötigt, um das Sternchen (*) im JTabbedPane beim Zurückgehen in der Rückgängig-Liste an der passenden Stelle auszublenden
+	private int posInRueckgaengigListeWoZuletztGespeichert = -1; //Index, in der Rückgängig-Liste bei dem zuletzt gespeichert wurde; steuert die „ungespeichert“-Markierung im Tab (Punkt)
 	private Font fontStr = GlobalSettings.fontStandard;
 
 	//Konstanten die jedem StruktogrammElement einen int-Wert zuordnen
@@ -158,11 +161,6 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 		addMouseMotionListener(this);
 
 
-		if(GlobalSettings.isBeiMausradGroesseAendern()){
-			addMouseWheelListener(this);
-		}
-
-
 		/*Drag & Drop aktivieren, siehe
         http://www.java2s.com/Code/Java/Swing-JFC/MakingaComponentDraggable.htm
         und
@@ -171,7 +169,6 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 		dragSource = new DragSource();
 		dragSource.createDefaultDragGestureRecognizer(this, DnDConstants.ACTION_COPY_OR_MOVE, this);
 
-		//dropTarget = 
 		new DropTarget(this, DnDConstants.ACTION_COPY_OR_MOVE, this, true, null);
 
 
@@ -180,12 +177,43 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	}
 
 
-	public void mausradScrollEinOderAusschalten(boolean einschalten){
-		if(einschalten){
-			addMouseWheelListener(this);		
-		}else{
-			removeMouseWheelListener(this);
+	/** Vergrößert die Diagramm-Ansicht (nicht die Block-Pixel im Modell). */
+	public void canvasZoomIn() {
+		canvasViewScale = Math.min(CANVAS_ZOOM_MAX, canvasViewScale * CANVAS_ZOOM_STEP);
+		applyCanvasViewLayoutSize();
+	}
+
+	/** Verkleinert die Diagramm-Ansicht. */
+	public void canvasZoomOut() {
+		canvasViewScale = Math.max(CANVAS_ZOOM_MIN, canvasViewScale / CANVAS_ZOOM_STEP);
+		applyCanvasViewLayoutSize();
+	}
+
+	private void applyCanvasViewLayoutSize() {
+		if (dimGroesse == null || dimGroesse.width <= 0 || dimGroesse.height <= 0) {
+			return;
 		}
+		Dimension view = new Dimension(
+				Math.max(1, (int) Math.ceil(dimGroesse.width * canvasViewScale)),
+				Math.max(1, (int) Math.ceil(dimGroesse.height * canvasViewScale)));
+		setSize(view);
+		setPreferredSize(view);
+		revalidate();
+		if (getParent() != null) {
+			getParent().revalidate();
+		}
+		repaint();
+	}
+
+	private Point viewKoordsZuLogisch(int vx, int vy) {
+		if (canvasViewScale <= 0d || Math.abs(canvasViewScale - 1d) < 1e-9) {
+			return new Point(vx, vy);
+		}
+		return new Point((int) Math.round(vx / canvasViewScale), (int) Math.round(vy / canvasViewScale));
+	}
+
+	private Point viewKoordsZuLogisch(MouseEvent e) {
+		return viewKoordsZuLogisch(e.getX(), e.getY());
 	}
 
 	public StruktogrammElementListe gibListe(){
@@ -245,36 +273,6 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 
 
-	//erzeugt JScrollPane, legt dieses Struktogramm in das JScrollPane und gibt das JScrollPane zurück, damit es in das JTabbedPane gelegt werden kann (siehe StrTabbedPane.struktogrammHinzufuegen())
-	//	public JScrollPane gibScrollPaneFuerContainer(){
-	//		//		scrollpane = new JScrollPane(this);//http://www.dpunkt.de/java/Programmieren_mit_Java/Oberflaechenprogrammierung/14.html
-	//		//		scrollpane.setBounds(getBounds());
-	//		//
-	//		//		scrollpane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-	//		//		scrollpane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-	//		//
-	//		//		setBounds(scrollpane.getBounds());
-	//		//
-	//		//		scrollpane.addComponentListener(new ComponentListener() { //Listener zum Mitverfolgen von Größenveränderungen durch den User
-	//		//			public void componentResized(ComponentEvent e){
-	//		//				if((g != null) && (ueberwacheResize)){//nur wenn die GUI ueberwacheResize true gesetzt hat, sonst wird es beim einfügen neuer Elemente ausgeführt, wenn der Anzeigebereich verlassen wird, und beim Scrollpane gibt es Probleme
-	//		//					zeichenbereichAktualisieren(); //wenn die Größe geändert wurde, muss der Zeichenbereich aktualisiert werden, sonst wird das Struktogramm gestreckt oder verkleinert dargestellt
-	//		//					zeichne();
-	//		//					ueberwacheResize = false;
-	//		//				}
-	//		//			}
-	//		//			public void componentMoved(ComponentEvent e){}
-	//		//			public void componentShown(ComponentEvent e){}
-	//		//			public void componentHidden(ComponentEvent e){}
-	//		//		});
-	//		//
-	//		//		return scrollpane;
-	//
-	//
-	//		return new JScrollPane(this);
-	//
-	//	}
-
 
 	/** Text- und Linienglättung auf dem Offscreen-Canvas (immer aktiv). */
 	private static void applyCanvasRenderingHints(Graphics2D g2){
@@ -288,17 +286,13 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 	//Graphics-Kontext Panel (Struktogramm) wird gespeichert und ein BufferedImage wird erzeugt und dessen Graphics-Kontext an alle StruktogrammElemente weitergegeben
 	public boolean graphicsInitialisieren(){
-		//panelGraphics = (Graphics2D)getGraphics();//Panel Graphics-Kontext speichern
 
-		//if((getWidth() > 0) || (getHeight() > 0)){
 		if((dimGroesse.width > 0) || (dimGroesse.height > 0)){
-			//bild = (BufferedImage)createImage(getWidth(),getHeight());//BufferedImage erzeugen
 			bild = (BufferedImage)createImage(dimGroesse.width, dimGroesse.height);
 			g = bild.createGraphics();//Graphics-Kontext in g speichern
 
 			applyCanvasRenderingHints(g);
 
-			//g.setFont(new Font("serif", Font.PLAIN, 15)); //Schriftart für die StruktogrammElemente setzen
 			g.setFont(fontStr);
 			g.setStroke(new BasicStroke(CanvasStyle.DIAGRAM_LINE_WIDTH));
 			liste.graphicsAllerUnterlementeSetzen(g); //g an alle StruktogrammElemente weitergeben
@@ -317,14 +311,6 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	}
 
 
-	//	public void revalidate(){
-	//		super.revalidate();
-	//		if(liste != null){
-	//			zeichenbereichAktualisieren();
-	//		}
-	//	}
-
-
 	public void zeichne(){
 		repaint();
 	}
@@ -337,7 +323,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 			applyCanvasRenderingHints(g);
 
 			g.setColor(CanvasStyle.getBackground());
-			g.fillRect(0, 0, getWidth(), getHeight());
+			g.fillRect(0, 0, dimGroesse.width, dimGroesse.height);
 
 			if(!struktogrammBeschreibung.isEmpty()){
 				Font f = g.getFont();
@@ -383,11 +369,13 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 				g.setStroke(alt);
 			}
 
-			//Point scrollweite = scrollpane.getViewport().getViewPosition();
-
-
-			//panelGraphics.drawImage(bild,-scrollweite.x,-scrollweite.y,getWidth(),getHeight(),this);//auf Bild auf Panel zeichnen, dabei so verschieben, dass es mit den Scrollbalken passt
-			panelGraphics.drawImage(bild, 0, 0, dimGroesse.width, dimGroesse.height, this);
+			int viewW = Math.max(1, (int) Math.ceil(dimGroesse.width * canvasViewScale));
+			int viewH = Math.max(1, (int) Math.ceil(dimGroesse.height * canvasViewScale));
+			if (panelGraphics instanceof Graphics2D) {
+				Graphics2D pg2 = (Graphics2D) panelGraphics;
+				pg2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			}
+			panelGraphics.drawImage(bild, 0, 0, viewW, viewH, 0, 0, dimGroesse.width, dimGroesse.height, this);
 
 
 
@@ -429,19 +417,9 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 
 
-	//	@Override //bevorzugte Größe soll die Größe des Panels sein (wichtig für das JScrollPane
-	//	public Dimension getPreferredSize(){//http://www.java-forum.org/allgemeine-java-themen/95703-jscrollpane-jpanel-scrollen-nur-groesse-jpanels.html
-	//		return dimGroesse;
-	//	}
-
-
-
 	//die Zeichenbereiche aller StruktogrammElemente werden gesetzt
 	public void zeichenbereichAktualisieren(){
 
-
-		//Point viewportPositionVorher = scrollpane.getViewport().getViewPosition(); //Abspeichern der aktuellen Position des gescrollten Bildes
-		//scrollpane.getViewport().setViewPosition(new Point(0,0)); //zurücksetzen der ViewPosition auf (0/0), sonst entstehen Probleme weiter unten und am Ende kann man nicht mehr das ganze Struktogramm durch Scrollen erreichen, weil es verschoben ist
 
 		int randLinksNeu = randLinks + (!struktogrammBeschreibung.isEmpty() ? 20 : 0);
 		int randObenNeu = randOben + (!struktogrammBeschreibung.isEmpty() ? 40 : 0);
@@ -458,25 +436,8 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 			}
 		}
 
-		//Dimension scrollpaneSichtbarerBereich = scrollpane.getViewport().getExtentSize();//Größe des sichtbaren Bereiches ermitteln, siehe: http://download.oracle.com/javase/1.4.2/docs/api/javax/swing/JViewport.html
-
-		//Wenn der sichtbare Bereich Größer ist als das Struktogramm, wird die Struktogrammgröße vergrößert
-		//		if (dimGroesse.width < scrollpaneSichtbarerBereich.width){
-		//			dimGroesse.width = scrollpaneSichtbarerBereich.width;
-		//		}
-		//
-		//		if (dimGroesse.height < scrollpaneSichtbarerBereich.height){
-		//			dimGroesse.height = scrollpaneSichtbarerBereich.height;
-		//		}
-
-		setSize(dimGroesse);
-		setPreferredSize(dimGroesse);
 		graphicsInitialisieren(); //sonst ist alles später gestretcht, weil das BufferedImage noch immer die gleichen Ausmaße hat
-
-
-		//scrollpane.getViewport().setViewPosition(viewportPositionVorher);//ViewPosition des JScrollPane auf die vorherige Position setzen
-
-
+		applyCanvasViewLayoutSize();
 	}
 
 
@@ -487,7 +448,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 
 	public void rueckgaengigPunktSetzen(){
-		rueckgaengigPunktSetzen(true);//true besagt, es soll der Titel des aktuellen Tab im JTabbedPane aktualisiert werden ((*) hinzufügen oder entfernen)
+		rueckgaengigPunktSetzen(true);//true: Tab „ungespeichert“-Kennzeichen aktualisieren
 	}
 
 
@@ -508,7 +469,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 		posInRueckgaengigListe = rueckgaengigListe.size() -1; //aktuelle Position ist die Letzte in der Liste
 
 		if(tabbedpaneTitelAnpassen)  //bei Bedarf Titel aktualisieren
-			tabbedpane.titelFuerStruktogrammBearbeitetMarkieren(this, true);//true sagt, das Struktogramm wurde bearbeitet, also soll an den Titel ein (*) angehangen werden
+			tabbedpane.titelFuerStruktogrammBearbeitetMarkieren(this, true);//Struktogramm wurde bearbeitet → Tab als ungespeichert markieren
 	}
 
 
@@ -538,7 +499,30 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	}
 
 	public void elementTextAusEditorSetzen(StruktogrammElement element, String[] text){
-		if (element == null || element instanceof LeerElement || text == null) {
+		if (element == null || text == null) {
+			return;
+		}
+		if (element instanceof LeerElement) {
+			LeerElement leer = (LeerElement) element;
+			Graphics2D g2 = gibGraphics();
+			if (g2 == null) {
+				return;
+			}
+			StruktogrammElementListe zListe = liste.gibListeDieDasElementHat(leer);
+			if (zListe == null) {
+				return;
+			}
+			int idx = zListe.indexOf(leer);
+			if (idx < 0) {
+				return;
+			}
+			Anweisung neu = new Anweisung(g2);
+			neu.setzeText(text);
+			zListe.set(idx, neu);
+			rueckgaengigPunktSetzen();
+			zeichenbereichAktualisieren();
+			elementAuswaehlen(neu);
+			zeichne();
 			return;
 		}
 
@@ -620,8 +604,6 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 	//ein neues StruktogrammElement wird anhand der Typnummer erzeugt und zurückgegeben
 	public StruktogrammElement neuesStruktogrammElement(int typ){
-		//GUI gui = gibTabbedPane().gibGUI();  
-
 		switch(typ){
 		case 0: return new Anweisung(g);
 		case 1: return new Verzweigung(g);
@@ -644,7 +626,10 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	public void neuesElementAnAktuellerStelleEinfuegen(int typ){
 		Point p = ausgewaehlteEinfuegeKoords;
 		if (p == null) {
-			p = getMousePosition();
+			Point mp = getMousePosition();
+			if (mp != null) {
+				p = viewKoordsZuLogisch(mp.x, mp.y);
+			}
 		}
 		if (p == null) {
 			p = letzteDiagrammMausKoords;
@@ -673,7 +658,11 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	 * Wird in KeyReleased in Controlling genutzt
 	 */
 	public void elementAnAktuellerStelleLoeschen(){
-		Point p = getMousePosition();
+		Point mp = getMousePosition();
+		if (mp == null) {
+			return;
+		}
+		Point p = viewKoordsZuLogisch(mp.x, mp.y);
 		StruktogrammElement element = (StruktogrammElement)liste.gibElementAnPos(p.x, p.y, false);
 
 		if(element != null){
@@ -685,9 +674,9 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	 * Wird in KeyReleased in Controlling genutzt
 	 */
 	public void zoomAktuellesElement(boolean groesser){
-		Point p = getMousePosition();		
-		if(p != null){
-
+		Point mp = getMousePosition();
+		if(mp != null){
+			Point p = viewKoordsZuLogisch(mp.x, mp.y);
 			StruktogrammElement element = (StruktogrammElement)liste.gibElementAnPos(p.x, p.y, false);
 
 			if(element != null){
@@ -857,12 +846,13 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 
 	//Rechtsklick an der Position (x/y) wurde registriert, also Popup-Menü anzeigen
-	private void popupMenueZeigen(int x, int y){
-		StruktogrammElement tmp = (StruktogrammElement)liste.gibElementAnPos(x,y,false);
+	private void popupMenueZeigen(int viewX, int viewY){
+		Point log = viewKoordsZuLogisch(viewX, viewY);
+		StruktogrammElement tmp = (StruktogrammElement)liste.gibElementAnPos(log.x, log.y, false);
 
 		if (tmp != null) {
-			popup = new StruktogrammPopup(tmp, this, x, y);
-			popup.show(this, x, y);
+			popup = new StruktogrammPopup(tmp, this, log.x, log.y);
+			popup.show(this, viewX, viewY);
 		}
 	}
 
@@ -1053,7 +1043,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	private void laden(Document document){//Rückgängig-Punkt muss hier nicht gesetzt werden, weil diese Methode nur mit Document Objekten aus der rueckgaengigListe angewandt wird
 		XMLLeser tmp = new XMLLeser();
 		tmp.ladeXML(document,this);
-		tabbedpane.titelFuerStruktogrammBearbeitetMarkieren(this, posInRueckgaengigListeWoZuletztGespeichert != posInRueckgaengigListe);//als bearbeitet markieren ("*" anhängen) (wenn posInRueckgaengigListeWoZuletztGespeichert != posInRueckgaengigListe) oder als abgespeichert (wenn posInRueckgaengigListeWoZuletztGespeichert == posInRueckgaengigListe)
+		tabbedpane.titelFuerStruktogrammBearbeitetMarkieren(this, posInRueckgaengigListeWoZuletztGespeichert != posInRueckgaengigListe);//ungespeichert-Markierung im Tab an Rückgängig-Position koppeln
 
 		zeichenbereichAktualisieren();
 		zeichne();
@@ -1228,7 +1218,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 			tabbedpane.titelFuerStruktogrammBearbeitetMarkieren(this, false);
 			posInRueckgaengigListeWoZuletztGespeichert = posInRueckgaengigListe;
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOG.log(Level.SEVERE, "XML speichern fehlgeschlagen: " + pfad, e);
 			JOptionPane.showMessageDialog(tabbedpane.gibGUI(),
 					I18n.trf("dialog.saveError.message", e.getMessage()),
 					I18n.tr("dialog.saveError.title"), JOptionPane.ERROR_MESSAGE);
@@ -1260,11 +1250,13 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 
 	public void mouseMoved(MouseEvent e){
-		mausBewegt(e.getX(),e.getY(),false);
+		Point p = viewKoordsZuLogisch(e);
+		mausBewegt(p.x, p.y, false);
 	}
 
 	public void mouseDragged(MouseEvent e){
-		mausBewegt(e.getX(),e.getY(),false);
+		Point p = viewKoordsZuLogisch(e);
+		mausBewegt(p.x, p.y, false);
 	}
 
 	public void mouseExited(MouseEvent e){
@@ -1284,14 +1276,15 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	}
 
 	public void mouseClicked(MouseEvent e){
-		letzteDiagrammMausKoords = new Point(e.getX(), e.getY());
+		Point log = viewKoordsZuLogisch(e);
+		letzteDiagrammMausKoords = new Point(log.x, log.y);
 		if (SwingUtilities.isLeftMouseButton(e)) { // linke Maustaste
-			einfuegeZielSetzen(e.getX(), e.getY());
-			vorschauMarkierungAnzeigen(e.getX(), e.getY(), false);
-			elementAnPosBefuellen(e.getX(), e.getY()); // EingabeDialog öffnen
+			einfuegeZielSetzen(log.x, log.y);
+			vorschauMarkierungAnzeigen(log.x, log.y, false);
+			elementAnPosBefuellen(log.x, log.y); // EingabeDialog öffnen
 			zeichne();
 		} else if (SwingUtilities.isRightMouseButton(e)) { // rechte Maustaste
-			popupMenueZeigen(e.getX(), e.getY()); // Popup-Menü zeigen
+			popupMenueZeigen(e.getX(), e.getY()); // Popup an View-Position; Hit-Test in logischen Koordinaten
 		}
 	}
 
@@ -1419,7 +1412,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 			event.dropComplete(true);
 		}catch (Exception e){
-			e.printStackTrace();
+			LOG.log(Level.WARNING, "Drop auf Struktogramm fehlgeschlagen", e);
 			event.rejectDrop();
 		}
 	}
@@ -1448,37 +1441,13 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	//http://www.tutego.de/java/articles/Absolute-Koordinaten-Swing-Element.html
 	public Point bildschirmKoordZuStruktogrammKoord(Point bildschirmKoord){
 		Point scrollpanePoint = getParent().getLocation();
-		return new Point(bildschirmKoord.x - scrollpanePoint.x, bildschirmKoord.y - scrollpanePoint.y);
+		int lx = bildschirmKoord.x - scrollpanePoint.x;
+		int ly = bildschirmKoord.y - scrollpanePoint.y;
+		return viewKoordsZuLogisch(lx, ly);
 	}
 
 
 
-
-	//	public void setzeUeberwacheResize(boolean ueberwacheResize){
-	//		this.ueberwacheResize = ueberwacheResize;
-	//
-	//		if(ueberwacheResize){
-	//			//scrollpane.getViewport().setViewPosition(new Point(0,0));//Scroll nach oben setzen, sonst gibt es Scrollpane-Probleme beim Verkleinern
-	//		}
-	//	}
-
-
-
-	@Override
-	public void mouseWheelMoved(MouseWheelEvent e) {
-		StruktogrammElement tmp = (StruktogrammElement)liste.gibElementAnPos(e.getX(), e.getY(), false);
-
-		if(tmp != null){
-
-			if(e.getWheelRotation() < 0){
-				//Vergrößern
-				zoom(1,1,tmp);
-			}else{
-				//Verkleinern
-				zoom(-1,-1,tmp);
-			}			
-		}
-	}
 
 	/**
 	 * Führt das Vergrößern oder Verkleinern eines Elementes durch.

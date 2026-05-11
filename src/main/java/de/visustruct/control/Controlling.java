@@ -22,6 +22,8 @@ import java.awt.print.PageFormat;
 import java.awt.print.Printable;
 import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JEditorPane;
@@ -56,6 +58,8 @@ import de.visustruct.view.ZoomEinstellungen;
 
 public class Controlling implements Konstanten, ActionListener, WindowListener, KeyListener {
 
+	private static final Logger LOG = Logger.getLogger(Controlling.class.getName());
+
 	private GUI gui;
 	private enum Betriebssysteme {Windows, Mac, Linux};
 
@@ -88,7 +92,7 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 			}
 
 		}catch(Exception e){
-			e.printStackTrace();
+			LOG.log(Level.SEVERE, "Theme/OS-Initialisierung fehlgeschlagen", e);
 		}
 	}
 
@@ -102,14 +106,9 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 			case lookAndFeelOSStandard:
 				try {
 					UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-				} catch (ClassNotFoundException e1) {
-					e1.printStackTrace();
-				} catch (InstantiationException e1) {
-					e1.printStackTrace();
-				} catch (IllegalAccessException e1) {
-					e1.printStackTrace();
-				} catch (UnsupportedLookAndFeelException e1) {
-					e1.printStackTrace();
+				} catch (ClassNotFoundException | InstantiationException | IllegalAccessException
+						| UnsupportedLookAndFeelException e1) {
+					LOG.log(Level.WARNING, "System-Look-and-Feel konnte nicht gesetzt werden", e1);
 				}
 				break;
 
@@ -121,7 +120,7 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 						UIManager.setLookAndFeel(new FlatLightLaf());
 					}
 				} catch (UnsupportedLookAndFeelException e) {
-					e.printStackTrace();
+					LOG.log(Level.WARNING, "FlatLight-Look-and-Feel konnte nicht gesetzt werden", e);
 				}
 				break;
 
@@ -133,7 +132,7 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 						UIManager.setLookAndFeel(new FlatDarkLaf());
 					}
 				} catch (UnsupportedLookAndFeelException e) {
-					e.printStackTrace();
+					LOG.log(Level.WARNING, "FlatDark-Look-and-Feel konnte nicht gesetzt werden", e);
 				}
 				break;
 
@@ -150,14 +149,14 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 				try {
 					UIManager.setLookAndFeel(lookAndFeel);
 				} catch (UnsupportedLookAndFeelException e) {
-					e.printStackTrace();
+					LOG.log(Level.WARNING, "Look-and-Feel (Metal/Nimbus) konnte nicht gesetzt werden", e);
 				}
 			}
 
 			UiTheme.applyAfterTheme();
 			I18n.applyFileChooserStrings();
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOG.log(Level.SEVERE, "Look-and-Feel-Konfiguration fehlgeschlagen", e);
 		}
 	}
 
@@ -209,8 +208,13 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 
 		if(str != null){
 			GlobalSettings.setzeSpeicherpfad(str.speichern(neuenSpeicherpfadAuswaehlenLassen,GlobalSettings.getZuletztGenutzterSpeicherpfad()));//Struktogramm wird gespeichert (zuletztGenutzterSpeicherpfad wird dabei übergeben, damit der JFileChooser, sofern er genutzt wird, dort startet) und der neue Speicherpfad wird gesichert
+			String p = str.gibAktuellenSpeicherpfad();
+			if (!p.isEmpty()) {
+				GlobalSettings.rememberRecentStruktogrammPath(p);
+			}
 			GlobalSettings.saveSettings();
 			titelleisteAktualisieren();
+			gui.rebuildMenuBar();
 		}
 	}
 
@@ -230,8 +234,28 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 		str.graphicsInitialisieren();
 		str.laden(pfad);
 		GlobalSettings.setzeSpeicherpfad(pfad);
+		GlobalSettings.rememberRecentStruktogrammPath(pfad);
 		GlobalSettings.saveSettings();
 		titelleisteAktualisieren();
+		gui.rebuildMenuBar();
+	}
+
+
+	/** Öffnet eine gespeicherte Datei aus dem Menü „Zuletzt geöffnet“. */
+	public void oeffneStruktogrammAusZuletztListe(String pfad) {
+		if (pfad == null || pfad.isBlank()) {
+			return;
+		}
+		File f = new File(pfad);
+		if (!f.isFile()) {
+			GlobalSettings.removeRecentStruktogrammPath(pfad);
+			GlobalSettings.saveSettings();
+			gui.rebuildMenuBar();
+			JOptionPane.showMessageDialog(gui, I18n.trf("dialog.recentMissing.message", pfad),
+					I18n.tr("dialog.recentMissing.title"), JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		openStruktogramm(pfad);
 	}
 
 
@@ -382,10 +406,6 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 
 		case schriftartAendern:
 			new FontChooser(this,true);
-			break;
-
-		case groesseAendernMitMausrad:
-			mitMausradElementeVergroessernGeklickt(e.getSource());
 			break;
 
 		case zoomeinstellungen:
@@ -555,16 +575,6 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 	}
 
 
-	private void mitMausradElementeVergroessernGeklickt(Object source){
-		boolean einOderAus = ((JCheckBoxMenuItem)source).isSelected();
-		GlobalSettings.setBeiMausradGroesseAendern(einOderAus);
-		GlobalSettings.saveSettings();
-		gibAktuellesStruktogramm().mausradScrollEinOderAusschalten(einOderAus);
-		gibAktuellesStruktogramm().zeichenbereichAktualisieren();
-		gibAktuellesStruktogramm().zeichne();
-	}
-
-
 	private void elementEinfuegenShortcutsVerwendenGeklickt(Object source){
 		boolean einOderAus = ((JCheckBoxMenuItem)source).isSelected();
 		GlobalSettings.setElementShortcutsVerwenden(einOderAus);
@@ -642,18 +652,6 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 
 	@Override
 	public void keyTyped(KeyEvent e) {
-		if(e.getSource() == gui.gibTabbedpane() && (e.getModifiersEx() & GlobalSettings.strgOderApfelMask) == 0){
-
-			switch(e.getKeyChar()){
-			case '+':
-				gibAktuellesStruktogramm().zoomAktuellesElement(true);
-				break;
-
-			case '-':
-				gibAktuellesStruktogramm().zoomAktuellesElement(false);
-				break;
-			}
-		}
 	}
 
 

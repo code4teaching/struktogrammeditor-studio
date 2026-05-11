@@ -140,14 +140,19 @@ public class ElementEditorPanel extends JPanel {
 
 		updating = true;
 		try {
-			boolean editable = element != null && !(element instanceof LeerElement);
-			boolean statement = element instanceof Anweisung && !(element instanceof LeerElement);
+			boolean editable = element != null;
+			boolean statement = element instanceof Anweisung && !(element instanceof Aufruf)
+					&& !(element instanceof Aussprung);
 			boolean forLoop = element instanceof ForSchleife;
 			boolean switchElement = element instanceof Fallauswahl && !(element instanceof Verzweigung);
 			String elementText = editable ? textAusElement(element) : "";
+			if (element instanceof LeerElement) {
+				elementText = "";
+			}
 			statementMode = statement ? erkenneStatementMode(elementText) : StatementMode.STATEMENT;
 			String editorText = statement ? editorTextFuerStatement(elementText, statementMode) : elementText;
-			boolean placeholder = editable && istPlatzhalterText(editorText);
+			boolean placeholder = editable && (istPlatzhalterText(editorText)
+					|| (element instanceof LeerElement && editorText.trim().isEmpty()));
 			titleLabel.setText(editable ? elementTitel(element) : "No editable element selected");
 			statementButton.setSelected(statementMode == StatementMode.STATEMENT);
 			inputButton.setSelected(statementMode == StatementMode.INPUT);
@@ -181,7 +186,7 @@ public class ElementEditorPanel extends JPanel {
 	}
 
 	private void applyText() {
-		if (updating || struktogramm == null || element == null || element instanceof LeerElement) {
+		if (updating || struktogramm == null || element == null) {
 			return;
 		}
 

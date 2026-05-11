@@ -15,12 +15,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import de.visustruct.i18n.StructureElementI18n;
 import de.visustruct.view.CodeErzeuger;
@@ -28,6 +33,8 @@ import de.visustruct.view.ElementBeschriftungPresets;
 import de.visustruct.view.StruktogrammPalette;
 
 public class GlobalSettings implements Konstanten{
+
+	private static final Logger LOG = Logger.getLogger(GlobalSettings.class.getName());
 
 	/** Anzeigename in Titelleiste, Dock und Infodialog (unabhängig vom ursprünglichen Projektautor). */
 	public static final String APP_DISPLAY_NAME = "VisuStruct";
@@ -60,6 +67,9 @@ public class GlobalSettings implements Konstanten{
 
 	private static String zuletztGenutzterSpeicherpfad = "";
 	private static String zuletztGenutzterPfadFuerBild = "";
+
+	private static final int MAX_RECENT_DIAGRAM_FILES = 10;
+	private static final List<String> recentDiagramPaths = new ArrayList<>();
 	/** Standard an: Spalten bei Verzweigung/Fallauswahl unten bündig (letztes Element wird bei Bedarf gestreckt). */
 	private static boolean letzteElementeStrecken = true;
 	/**
@@ -103,7 +113,6 @@ public class GlobalSettings implements Konstanten{
 	private static int codeErzeugerProgrammiersprache = CodeErzeuger.typJava;
 	private static boolean codeErzeugerAlsKommentar = true;
 	
-	private static boolean beiMausradGroesseAendern = false;
 	private static boolean elementShortcutsVerwenden = true;
 	
 	private static int xZoomProSchritt = 10;
@@ -159,7 +168,7 @@ public class GlobalSettings implements Konstanten{
 				pr.load(in);
 				in.close();
 			} catch (IOException e) {
-				e.printStackTrace();
+				LOG.log(Level.WARNING, "build.properties konnte nicht gelesen werden", e);
 			}
 
 			String s;
@@ -188,7 +197,7 @@ public class GlobalSettings implements Konstanten{
 			}
 
 		} catch (RuntimeException e){
-			e.printStackTrace();
+			LOG.log(Level.WARNING, "build.properties: unerwarteter Fehler", e);
 		}
 	}
 	
@@ -220,7 +229,7 @@ public class GlobalSettings implements Konstanten{
 				pr.load(in);
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			LOG.log(Level.WARNING, "Einstellungsdatei konnte nicht gelesen werden: " + toLoad, e);
 			return;
 		}
 
@@ -264,11 +273,6 @@ public class GlobalSettings implements Konstanten{
 		s = pr.getProperty("cecomments");
 		if(s != null){
 			codeErzeugerAlsKommentar = s.equals("1");
-		}
-
-		s = pr.getProperty("mousewheelresize");
-		if(s != null){
-			beiMausradGroesseAendern = s.equals("1");
 		}
 
 		s = pr.getProperty("useelementshortcuts");
@@ -326,6 +330,15 @@ public class GlobalSettings implements Konstanten{
 			setUiLanguageTag(s);
 			uiLanguageFromPropertiesFile = true;
 		}
+
+		recentDiagramPaths.clear();
+		for (int i = 0; i < MAX_RECENT_DIAGRAM_FILES; i++) {
+			s = pr.getProperty("recentdiagram" + i);
+			if (s == null || s.isBlank()) {
+				break;
+			}
+			recentDiagramPaths.add(s.trim());
+		}
 	}
 
 	/** Wenn keine {@code uilanguage} in den Einstellungen: an JVM-Locale anlehnen (z. B. deutsch → {@code de}). */
@@ -355,7 +368,6 @@ public class GlobalSettings implements Konstanten{
 		properties.setProperty("celanguage", ""+codeErzeugerProgrammiersprache);
 		properties.setProperty("cecomments", codeErzeugerAlsKommentar ? "1" : "0");
 		
-		properties.setProperty("mousewheelresize", beiMausradGroesseAendern ? "1" : "0");
 		properties.setProperty("useelementshortcuts", elementShortcutsVerwenden ? "1" : "0");
 		
 		properties.setProperty("pathfiles", zuletztGenutzterSpeicherpfad);
@@ -370,6 +382,14 @@ public class GlobalSettings implements Konstanten{
 
 		properties.setProperty("uilanguage", uiLanguageTag);
 
+		for (int i = 0; i < MAX_RECENT_DIAGRAM_FILES; i++) {
+			if (i < recentDiagramPaths.size()) {
+				properties.setProperty("recentdiagram" + i, recentDiagramPaths.get(i));
+			} else {
+				properties.setProperty("recentdiagram" + i, "");
+			}
+		}
+
 		try {
 			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(new File(einstellungsDateiPfad)));
 
@@ -382,9 +402,9 @@ public class GlobalSettings implements Konstanten{
 			}
 
 		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+			LOG.log(Level.SEVERE, "Einstellungen: Datei nicht gefunden beim Speichern", e);
 		}catch (IOException e) {
-			e.printStackTrace();
+			LOG.log(Level.SEVERE, "Einstellungen konnten nicht gespeichert werden", e);
 		}
 	}
 
@@ -409,6 +429,49 @@ public class GlobalSettings implements Konstanten{
 
 	public static String getZuletztGenutzterPfadFuerBild() {
 		return zuletztGenutzterPfadFuerBild;
+	}
+
+	/** Unveränderliche Liste zuletzt geöffneter oder gespeicherter Struktogramm-Dateien (maximal zehn Einträge). */
+	public static List<String> getRecentDiagramPaths() {
+		return Collections.unmodifiableList(new ArrayList<>(recentDiagramPaths));
+	}
+
+	/** Pfad in die MRU-Liste (vorne); Duplikate werden zusammengeführt. */
+	public static void rememberRecentStruktogrammPath(String path) {
+		if (path == null) {
+			return;
+		}
+		String p = path.trim();
+		if (p.isEmpty()) {
+			return;
+		}
+		try {
+			p = new File(p).getCanonicalPath();
+		} catch (IOException ex) {
+			p = new File(p).getAbsolutePath();
+		}
+		recentDiagramPaths.remove(p);
+		recentDiagramPaths.add(0, p);
+		while (recentDiagramPaths.size() > MAX_RECENT_DIAGRAM_FILES) {
+			recentDiagramPaths.remove(recentDiagramPaths.size() - 1);
+		}
+	}
+
+	/** Entfernt einen Eintrag (z. B. Datei existiert nicht mehr). */
+	public static void removeRecentStruktogrammPath(String path) {
+		if (path == null) {
+			return;
+		}
+		String p = path.trim();
+		if (p.isEmpty()) {
+			return;
+		}
+		try {
+			p = new File(p).getCanonicalPath();
+		} catch (IOException ex) {
+			p = new File(p).getAbsolutePath();
+		}
+		recentDiagramPaths.remove(p);
 	}
 
 	public static void setzeLetzteElementeStrecken(boolean strecken){
@@ -496,16 +559,6 @@ public class GlobalSettings implements Konstanten{
 
 	public static void setCodeErzeugerAlsKommentar(boolean codeErzeugerAlsKommentar) {
 		GlobalSettings.codeErzeugerAlsKommentar = codeErzeugerAlsKommentar;
-	}
-
-
-	public static void setBeiMausradGroesseAendern(boolean beiMausradGroesseAendern) {
-		GlobalSettings.beiMausradGroesseAendern = beiMausradGroesseAendern;
-	}
-
-
-	public static boolean isBeiMausradGroesseAendern() {
-		return beiMausradGroesseAendern;
 	}
 
 

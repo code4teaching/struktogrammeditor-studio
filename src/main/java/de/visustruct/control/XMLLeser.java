@@ -4,6 +4,8 @@ import java.awt.Font;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.jdom2.Document;
 import org.jdom2.Element;
@@ -19,6 +21,9 @@ import de.visustruct.struktogrammelemente.StruktogrammElementListe;
 //XML auslesen: http://www.javabeginners.de/XML/XML-Datei_lesen.php
 
 public class XMLLeser {
+
+	private static final Logger LOG = Logger.getLogger(XMLLeser.class.getName());
+
 	private Struktogramm struktogramm;
 
 	public XMLLeser(){
@@ -75,19 +80,9 @@ public class XMLLeser {
      wird gebraucht für die Kopier-Funktion*/
 	private StruktogrammElementListe wurzelStruktogrammElementErstellen(Element elem){
 		StruktogrammElementListe liste = new StruktogrammElementListe(null);
-		
+
 		listenelementeErstellen(elem, liste);
 		return liste;
-		
-//		Element wurzelElement = elem.getChildren("strelem");
-//		int typ = Integer.parseInt(wurzelElement.getAttributeValue("typ"));
-//		StruktogrammElement neues = struktogramm.neuesStruktogrammElement(typ);
-//
-//		setAttribute(neues,wurzelElement);
-//
-//		erstelleElementeRek(wurzelElement,neues);
-//
-//		return neues;
 	}
 
 
@@ -177,10 +172,8 @@ public class XMLLeser {
 			}
 
 
-		}catch(JDOMException e) {
-			e.printStackTrace();
-		}catch(IOException e) {
-			e.printStackTrace();
+		}catch(JDOMException | IOException e) {
+			LOG.log(Level.SEVERE, "Struktogramm-XML konnte nicht geladen werden", e);
 		}
 	}
 
@@ -192,15 +185,7 @@ public class XMLLeser {
 		if(document != null){
 			this.struktogramm = struktogramm;
 
-			//StruktogrammElement neues =
 			return wurzelStruktogrammElementErstellen(document.getRootElement());
-
-//			if(struktogramm.gibGraphics() != null){
-//				struktogramm.zeichenbereichAktualisieren();
-//				struktogramm.zeichne();
-//			}
-//
-//			return neues;
 
 		}else{
 

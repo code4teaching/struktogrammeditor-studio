@@ -2,7 +2,6 @@ package de.visustruct.view;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
-import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -26,14 +25,16 @@ import java.awt.dnd.DropTargetListener;
 
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JViewport;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingConstants;
@@ -50,13 +51,14 @@ import de.visustruct.i18n.I18n;
 
 public class AuswahlPanel extends JPanel implements DropTargetListener, DragGestureListener, DragSourceListener{
 
+	private static final Logger LOG = Logger.getLogger(AuswahlPanel.class.getName());
+
 	private static final long serialVersionUID = 3619714917985247680L;
 	private AuswahlPanelElement[] panelElemente = new AuswahlPanelElement[9]; //9 StruktogrammElemente stehen zur Auswahl
 	private JButton palettePngButton;
 	private JButton paletteInfoButton;
 	private DragSource dragSource;
-	//private DropTarget dropTarget;
-	private JLabel muelleimer;
+	private JButton muelleimer;
 	private boolean muelleimerIstAuf;
 	private Controlling controlling;
 	private Document kopiertesStrElement;
@@ -105,23 +107,18 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 			c.gridy++;
 		}
 
-		c.insets = new Insets(6, 0, 4, 0);
-		muelleimer = new JLabel();
+		c.insets = new Insets(12, 0, 8, 0);
+		c.fill = GridBagConstraints.HORIZONTAL;
+		JSeparator paletteBlockTrenner = new JSeparator(SwingConstants.HORIZONTAL);
+		add(paletteBlockTrenner, c);
+		c.gridy++;
+
+		c.insets = new Insets(2, 0, 4, 0);
+		c.fill = GridBagConstraints.HORIZONTAL;
+		muelleimer = paletteTrashButton();
 		muelleimerIstAuf = true;
 		muelleimerAuf(!muelleimerIstAuf);
-		muelleimer.setHorizontalAlignment(SwingConstants.CENTER);
-		muelleimer.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
-		muelleimer.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		muelleimerTooltipSetzen();
-		muelleimer.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				if (!SwingUtilities.isLeftMouseButton(e)) {
-					return;
-				}
-				controlling.gibAktuellesStruktogramm().markiertesElementLoeschen();
-			}
-		});
 		add(muelleimer, c);
 
 		c.gridy++;
@@ -132,12 +129,11 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		add(palettePngButton, c);
 		c.gridy++;
 
-		paletteInfoButton = paletteIconButton('\u2139', I18n.tr("palette.aboutTooltip"), I18n.tr("palette.aboutAccessible"));
+		paletteInfoButton = paletteAktionsButton(I18n.tr("palette.aboutVisuStruct"));
+		paletteInfoButton.setToolTipText(I18n.tr("palette.aboutTooltip"));
+		paletteInfoButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.aboutVisuStruct"));
 		paletteInfoButton.addActionListener(e -> controlling.showInfo());
-		JPanel infoRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
-		infoRow.setOpaque(false);
-		infoRow.add(paletteInfoButton);
-		add(infoRow, c);
+		add(paletteInfoButton, c);
 		c.gridy++;
 
 		kopiertesStrElement = null;
@@ -148,7 +144,6 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		c.fill = GridBagConstraints.VERTICAL;
 		add(Box.createVerticalGlue(), c);
 
-		//dropTarget = 
 		new DropTarget(this, DnDConstants.ACTION_COPY_OR_MOVE,this, true, null);
 	}
 
@@ -167,28 +162,56 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		return b;
 	}
 
-	/** Schaltfläche nur mit Symbol; Erklärung über Tooltip und Screenreader über {@code accessibleName}. */
-	private static JButton paletteIconButton(char symbol, String tooltip, String accessibleName) {
-		JButton b = new JButton(String.valueOf(symbol));
-		b.setToolTipText(tooltip);
-		b.getAccessibleContext().setAccessibleName(accessibleName);
+	/** Löschen: wie andere Paletten-Aktionen als Button, rot für destruktive Aktion. */
+	private JButton paletteTrashButton() {
+		JButton b = new JButton(I18n.tr("palette.deleteElement"));
 		b.setFocusable(false);
-		b.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 20));
-		b.setMargin(new Insets(2, 6, 2, 6));
+		b.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
 		PaletteButtonStyle.apply(b);
+		b.setForeground(paletteTrashBaseColor());
+		b.setIconTextGap(10);
+		b.setHorizontalAlignment(SwingConstants.CENTER);
+		b.setVerticalTextPosition(SwingConstants.CENTER);
+		b.setHorizontalTextPosition(SwingConstants.RIGHT);
+		b.setMargin(new Insets(6, 10, 6, 10));
+		b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		b.getAccessibleContext().setAccessibleName(I18n.tr("palette.deleteElement"));
+		b.addActionListener(e -> {
+			Struktogramm str = controlling.gibAktuellesStruktogramm();
+			if (str != null) {
+				str.markiertesElementLoeschen();
+			}
+		});
 		return b;
+	}
+
+	private static Color paletteTrashBaseColor() {
+		Color c = UIManager.getColor("Objects.Red");
+		if (c != null) {
+			return c;
+		}
+		c = UIManager.getColor("Component.error.focusedRingColor");
+		if (c != null) {
+			return c;
+		}
+		return new Color(0xC4, 0x2B, 0x1E);
 	}
 
 	
 	
 	public void aktualisiereBeschriftungen(){
+		muelleimer.setText(I18n.tr("palette.deleteElement"));
+		muelleimer.getAccessibleContext().setAccessibleName(I18n.tr("palette.deleteElement"));
+		muelleimer.setForeground(paletteTrashBaseColor());
 		muelleimerTooltipSetzen();
+		muelleimerIconZumAktuellenZustand();
 		if (palettePngButton != null) {
 			palettePngButton.setText(I18n.tr("palette.exportPng"));
 		}
 		if (paletteInfoButton != null) {
+			paletteInfoButton.setText(I18n.tr("palette.aboutVisuStruct"));
 			paletteInfoButton.setToolTipText(I18n.tr("palette.aboutTooltip"));
-			paletteInfoButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.aboutAccessible"));
+			paletteInfoButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.aboutVisuStruct"));
 		}
 		for (AuswahlPanelElement el : panelElemente) {
 			el.aktualisiereBeschriftung();
@@ -234,14 +257,16 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		}
 	}
 
-	private static FlatSVGIcon erzeugeMuelleimerIcon(boolean aktiv) {
-		FlatSVGIcon icon = new FlatSVGIcon("icons/lucide/trash-2.svg", 32, 32);
-		if (aktiv) {
-			java.awt.Color accent = UIManager.getColor("Component.accentColor");
-			if (accent != null) {
-				icon.setColorFilter(new FlatSVGIcon.ColorFilter(c -> accent));
-			}
-		}
+	private void muelleimerIconZumAktuellenZustand(){
+		muelleimer.setIcon(erzeugeMuelleimerIcon(muelleimerIstAuf));
+	}
+
+	/** @param hervorgehoben {@code true}, wenn der Mauszeiger beim Drag über dem Papierkorb liegt */
+	private static FlatSVGIcon erzeugeMuelleimerIcon(boolean hervorgehoben) {
+		FlatSVGIcon icon = new FlatSVGIcon("icons/lucide/trash-2.svg", 22, 22);
+		Color base = paletteTrashBaseColor();
+		Color use = hervorgehoben ? base.brighter() : base;
+		icon.setColorFilter(new FlatSVGIcon.ColorFilter(c -> use));
 		return icon;
 	}
 
@@ -332,15 +357,19 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 			}
 
 			muelleimerAuf(false);
+			PaletteButtonStyle.clearPressedArmedState(muelleimer);
 			event.dropComplete(true);
 		}catch (Exception e){
-			e.printStackTrace();
+			LOG.log(Level.WARNING, "Drop auf AuswahlPanel fehlgeschlagen", e);
+			muelleimerAuf(false);
+			PaletteButtonStyle.clearPressedArmedState(muelleimer);
 			event.rejectDrop();
 		}
 	}
 
 	public void dragExit(DropTargetEvent evt){
 		muelleimerAuf(false);
+		PaletteButtonStyle.clearPressedArmedState(muelleimer);
 	}
 
 	public void dropActionChanged(DropTargetDragEvent evt){
@@ -354,7 +383,7 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 	public void dragOver(DropTargetDragEvent evt){
 		Component tmp = getComponentAt(bildschirmKoordZuLokalenKoord(evt.getLocation())); //Komponente ermitteln, die unter der Maus ist
 
-		muelleimerAuf(tmp == muelleimer); //wenn die Komponente unter der Maus das Mülleimer-Label ist, dann geöffneten Mülleimer zeigen, sonst den Geschlossenen
+		muelleimerAuf(tmp == muelleimer); // über Papierkorb-Schaltfläche: Icon etwas heller
 	}
 
 

@@ -40,6 +40,10 @@ public class StruktogrammElementListe extends ArrayList<StruktogrammElement> {//
 		return bereich;
 	}
 
+	/** Breite der Spaltenüberschrift (z. B. „true“) plus Rand – für Mindestbreite der Kopfzeile. */
+	public int breiteFuerBeschriftungMitRand(int horizontalerRand) {
+		return gibTextbreite(gibBeschreibung()) + horizontalerRand;
+	}
 
 	public int gibAnzahlUnterelemente(){
 		return size();
@@ -65,11 +69,9 @@ public class StruktogrammElementListe extends ArrayList<StruktogrammElement> {//
 
 
 	public void schreibeXMLDatenAllerUnterElemente(Element parent){
-		//if (!(get(0) instanceof LeerElement)){//alle Struktogrammelemente, außer LeerElement, müssen XML-Daten schreiben
 		for (int i=0; i < size(); i++){
 			get(i).schreibeXMLDaten(parent);
 		}
-		//}
 	}
 
 
@@ -289,8 +291,9 @@ public class StruktogrammElementListe extends ArrayList<StruktogrammElement> {//
 
 		Dimension dim = gibDimensionDerUnterelemente();//größte Breite eines Unterlementes und Gesamthöhe aller Unterelemente
 
-		if (dim.width < gibTextbreite(gibBeschreibung() +8)){//Beschreibung ist bei Verzweigung und Fallauswahl kein leerer String (wird gesetzt in setzeFaelle(...) durch den EingabeDialog)
-			dim.width = gibTextbreite(gibBeschreibung()) +8;
+		int minBreiteNachBeschriftung = gibTextbreite(gibBeschreibung()) + 16;
+		if (dim.width < minBreiteNachBeschriftung) {
+			dim.width = minBreiteNachBeschriftung;
 		}
 
 		breiteDerUnterelementeSetzen(dim.width);//alle Unterelemente auf die gleiche Breite bringen

@@ -27,3 +27,6 @@ dist/
 
 # Abhängigkeitsordner irrtümlich im Projektroot (z. B. entpackte JARs)
 com/
+
+# Lokaler Klon des SwiftUI-Repos (nicht ins Java-Projekt einchecken)
+VisuStruct-swift/

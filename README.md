@@ -22,6 +22,14 @@ git clone https://github.com/code4teaching/VisuStruct.git
 
 ---
 
+## Changes in 1.1.4 (summary)
+
+- **Diagram:** canvas **view zoom** with **⌘+ / ⌘−** (macOS) or **Ctrl+ / Ctrl−** (Windows/Linux); **no** block resize via mouse wheel anymore.
+- **Tabs:** prompt to **save / discard / cancel** when closing a diagram with unsaved changes; dirty state shown in the tab header (not as `*` in the title).
+- **Code:** removed long blocks of commented-out legacy code (especially `Struktogramm`, `StrTabbedPane`, `XMLLeser`, palette/trash setup) for easier maintenance.
+
+Full notes: [`release-notes/v1.1.4.md`](release-notes/v1.1.4.md).
+
 ## Changes in 1.1.3 (summary)
 
 - **Tabs:** close tabs via middle-click, context menu, and **Ctrl+W** / **Cmd+W**; clicking the tab header switches diagrams reliably (close “×” is a label, not a button).
@@ -119,7 +127,7 @@ This release aligns **branding and technical identity** with **VisuStruct**. **`
 - **Java 17** target (build and run with JDK 17+).
 - **FlatLaf** light/dark themes; **JDOM2**; no legacy AppleJavaExtensions.
 - **Motif** look-and-feel removed; **Metal** and FlatLaf available.
-- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.1.3.jar`**).
+- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.1.4.jar`**).
 
 ---
 
@@ -194,13 +202,13 @@ chmod +x mvnw
 Output (version from `pom.xml`):
 
 ```text
-target/visustruct-1.1.3.jar
+target/visustruct-1.1.4.jar
 ```
 
 ## Run
 
 ```bash
-java -jar target/visustruct-1.1.3.jar
+java -jar target/visustruct-1.1.4.jar
 ```
 
 Double-click may work if `.jar` is associated with Java.

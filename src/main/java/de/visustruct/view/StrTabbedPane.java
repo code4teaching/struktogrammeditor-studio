@@ -29,10 +29,10 @@ import de.visustruct.i18n.I18n;
 public class StrTabbedPane extends JTabbedPane implements ChangeListener{
 
 	private static final String CLIENT_TAB_TITLE_LABEL = "visustruct.tabTitleLabel";
+	private static final String CLIENT_TAB_DIRTY_LABEL = "visustruct.tabDirtyLabel";
 
 	private static final long serialVersionUID = 1L;
 	private Controlling controlling;
-   //private boolean stateChangedFreigegeben;
 
    public StrTabbedPane(Controlling controlling){
       super(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
@@ -87,13 +87,12 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
 
 
    /**
-    * Doppelklick auf den Reiter: Namen ändern. Stern ({@code *}) bei ungespeicherten Änderungen bleibt erhalten.
+    * Doppelklick auf den Reiter: Namen ändern. Ungespeichert-Kennzeichen (Punkt) bleibt erhalten.
     * Ohne gespeicherte Datei: danach Speicherdialog (Ordner und Dateiname), damit der Speicherort gleich gewählt werden kann.
     */
    private void renameTabAt(int index) {
-      String raw = getTitleAt(index);
-      boolean dirty = raw.endsWith("*");
-      String current = dirty ? raw.substring(0, raw.length() - 1) : raw;
+      String current = getTitleAt(index);
+      boolean dirty = isTabTitleDirty(index);
 
       String neu = (String) JOptionPane.showInputDialog(controlling.getGUI(),
             I18n.tr("dialog.renameTab.message"), I18n.tr("dialog.renameTab.title"), JOptionPane.PLAIN_MESSAGE,
@@ -109,7 +108,8 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
          neu = neu.substring(0, 200);
       }
 
-      setTitleAt(index, neu + (dirty ? "*" : ""));
+      setTitleAt(index, neu);
+      setTabDirtyUI(index, dirty);
       Struktogramm str = gibStruktogrammAt(index);
       if (str != null && str.gibAktuellenSpeicherpfad().isEmpty()) {
          str.setVorgeschlagenenSpeicherBasisnamen(neu);
@@ -154,7 +154,9 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
    public void titelFuerStruktogrammSetzen(Struktogramm str, String titel) {
       int i = indexOfStruktogramm(str);
       if (i >= 0 && titel != null) {
+         boolean dirty = isTabTitleDirty(i);
          setTitleAt(i, titel);
+         setTabDirtyUI(i, dirty);
       }
    }
 
@@ -165,31 +167,25 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
          return;
       }
       String titel = getTitleAt(i);
+      if (titel.endsWith("*")) {
+         titel = titel.substring(0, titel.length() - 1);
+         setTitleAt(i, titel);
+      }
       if (bearbeitet) {
          if (titel.isEmpty()) {
-            titel = I18n.tr("tab.untitled") + "*";
-         } else if (titel.charAt(titel.length() - 1) != '*') {
-            titel += "*";
+            setTitleAt(i, I18n.tr("tab.untitled"));
          }
+         setTabDirtyUI(i, true);
       } else {
-         if (!titel.isEmpty() && titel.charAt(titel.length() - 1) == '*') {
-            titel = titel.substring(0, titel.length() - 1);
-         }
+         setTabDirtyUI(i, false);
       }
-      setTitleAt(i, titel);
    }
    
    
    public GUI gibGUI(){
 	   return controlling.getGUI();
    }
-   
-//   public void changeListenerAktivieren(){
-//      addChangeListener(this);
-//      stateChangedFreigegeben = true;
-//   }
-   
-   
+
    public Struktogramm struktogrammHinzufuegen(){
       Struktogramm str = new Struktogramm(this);
       JScrollPane scroll = new JScrollPane(str);
@@ -203,20 +199,22 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
       scroll.setBorder(BorderFactory.createLineBorder(bc, 1, true));
       add(I18n.tr("tab.untitled"), scroll);
       installClosableTabHeader(getTabCount() - 1);
-      //stateChangedFreigegeben = false; //changeListener kurz deaktivieren...
       setSelectedIndex(getTabCount() -1); //...weil es sonst in graphicsInitialisieren Probleme gibt
-      //stateChangedFreigegeben = true;
       return str;
    }
 
 	@Override
 	public void setTitleAt(int index, String title) {
-		super.setTitleAt(index, title);
+		String t = title == null ? "" : title;
+		if (t.endsWith("*")) {
+			t = t.substring(0, t.length() - 1);
+		}
+		super.setTitleAt(index, t);
 		Component tc = getTabComponentAt(index);
 		if (tc instanceof JPanel p) {
 			Object o = p.getClientProperty(CLIENT_TAB_TITLE_LABEL);
 			if (o instanceof JLabel lab) {
-				lab.setText(title);
+				lab.setText(t);
 			}
 		}
 	}
@@ -231,6 +229,13 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
 		}
 		JPanel tabBar = new JPanel(new BorderLayout(4, 0));
 		tabBar.setOpaque(false);
+
+		JLabel dirtyLabel = new JLabel("");
+		dirtyLabel.setOpaque(false);
+		dirtyLabel.setVisible(false);
+		dirtyLabel.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
+		dirtyLabel.setFont(dirtyLabel.getFont().deriveFont(Font.BOLD, 12f));
+		tabBar.putClientProperty(CLIENT_TAB_DIRTY_LABEL, dirtyLabel);
 
 		JLabel titleLabel = new JLabel(getTitleAt(index));
 		titleLabel.setOpaque(false);
@@ -256,6 +261,7 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
 			}
 		});
 
+		tabBar.add(dirtyLabel, BorderLayout.WEST);
 		tabBar.add(titleLabel, BorderLayout.CENTER);
 		tabBar.add(closeLbl, BorderLayout.EAST);
 
@@ -295,8 +301,66 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
 		};
 		tabBar.addMouseListener(headerMouse);
 		titleLabel.addMouseListener(headerMouse);
+		dirtyLabel.addMouseListener(headerMouse);
 
 		setTabComponentAt(index, tabBar);
+	}
+
+	private static void applyDirtyDotForeground(JLabel dirtyLab) {
+		Color c = UIManager.getColor("Component.accentColor");
+		if (c == null) {
+			c = UIManager.getColor("TabbedPane.focusColor");
+		}
+		if (c == null) {
+			c = UIManager.getColor("TabbedPane.selectedForeground");
+		}
+		if (c == null) {
+			c = UIManager.getColor("Label.foreground");
+		}
+		if (c == null) {
+			c = new Color(0x33, 0x66, 0xCC);
+		}
+		dirtyLab.setForeground(c);
+	}
+
+	private void setTabDirtyUI(int index, boolean dirty) {
+		if (index < 0 || index >= getTabCount()) {
+			return;
+		}
+		Component tc = getTabComponentAt(index);
+		if (!(tc instanceof JPanel tabBar)) {
+			return;
+		}
+		Object o = tabBar.getClientProperty(CLIENT_TAB_DIRTY_LABEL);
+		if (!(o instanceof JLabel dirtyLab)) {
+			return;
+		}
+		if (dirty) {
+			dirtyLab.setText("\u25CF");
+			applyDirtyDotForeground(dirtyLab);
+			dirtyLab.setVisible(true);
+			dirtyLab.getAccessibleContext().setAccessibleName(I18n.tr("tab.unsaved.a11y"));
+		} else {
+			dirtyLab.setText("");
+			dirtyLab.setVisible(false);
+			dirtyLab.getAccessibleContext().setAccessibleName("");
+		}
+		tabBar.revalidate();
+	}
+
+	/** Nach Theme-Wechsel: Punktfarbe an aktuelles UI anpassen. */
+	public void refreshTabHeaderDirtyAppearance() {
+		for (int i = 0; i < getTabCount(); i++) {
+			if (isTabTitleDirty(i)) {
+				Component tc = getTabComponentAt(i);
+				if (tc instanceof JPanel tabBar) {
+					Object o = tabBar.getClientProperty(CLIENT_TAB_DIRTY_LABEL);
+					if (o instanceof JLabel dirtyLab) {
+						applyDirtyDotForeground(dirtyLab);
+					}
+				}
+			}
+		}
 	}
 
 	private void maybeTabHeaderPopup(MouseEvent e, JPanel tabBar) {
@@ -338,7 +402,7 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
    }
 
    /**
-    * Reiter an {@code index} schließen. Ohne Änderungen ({@code *} im Titel) sofort entfernen; sonst wie bisher
+    * Reiter an {@code index} schließen. Ohne ungespeicherte Änderungen sofort entfernen; sonst wie bisher
     * nachfragen. Nach dem letzten Reiter wird automatisch ein neues Diagramm angelegt.
     * <p>Zusätzlich: Mittelklick auf Reiter, Kontextmenü (rechte Maustaste) → „Diagramm schließen“.</p>
     */
@@ -375,8 +439,18 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
    }
 
    private boolean isTabTitleDirty(int index) {
+      if (index < 0 || index >= getTabCount()) {
+         return false;
+      }
+      Component tc = getTabComponentAt(index);
+      if (tc instanceof JPanel tabBar) {
+         Object o = tabBar.getClientProperty(CLIENT_TAB_DIRTY_LABEL);
+         if (o instanceof JLabel dirtyLab && dirtyLab.isVisible() && !dirtyLab.getText().isEmpty()) {
+            return true;
+         }
+      }
       String t = getTitleAt(index);
-      return !t.isEmpty() && t.charAt(t.length() - 1) == '*';
+      return !t.isEmpty() && t.endsWith("*");
    }
 
    private void removeTabEnsureMinimum(int index) {
@@ -399,6 +473,7 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
             str.refreshAfterThemeChange();
          }
       }
+      refreshTabHeaderDirtyAppearance();
    }
 
 
@@ -415,27 +490,14 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
    
    
    public void stateChanged(ChangeEvent e){
-//      if (stateChangedFreigegeben && (getTabCount() > 1)){//wenn es das erste ist (nach Schließen), wird diese Methode aufgerufen und graphicsInitialisieren klappt noch nicht, darum nicht zulassen
-//
-//
-//         Struktogramm str = gibAktuellesStruktogramm();
-//         if (str != null){
-//            str.graphicsInitialisieren();
-//            str.zeichenbereichAktualisieren();
-//            str.zeichne();
-//            gui.titelleisteAktualisieren();
-//         }
-//      }
-	   
 	   controlling.titelleisteAktualisieren();
    }
    
    
    public boolean einOderMehrereStruktogrammeNichtGespeichert(){
       for(int i=0; i < getTabCount(); i++){
-         String t = getTitleAt(i);
-         if(!t.isEmpty() && t.charAt(t.length() - 1) == '*'){
-            return true;	 
+         if (isTabTitleDirty(i)) {
+            return true;
          }
       }
       
