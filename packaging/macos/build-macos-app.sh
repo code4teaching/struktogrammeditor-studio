@@ -4,7 +4,7 @@
 # Voraussetzung: JDK 17+ mit jpackage (im PATH oder JAVA_HOME).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-VER="${PROJECT_VERSION:-1.1.2}"
+VER="${PROJECT_VERSION:-1.1.3}"
 JAR="visustruct-${VER}.jar"
 INPUT="${ROOT}/target"
 OUT="${ROOT}/dist/macos-app"
