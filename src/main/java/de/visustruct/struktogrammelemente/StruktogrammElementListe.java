@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import org.jdom2.Element;
 
 import de.visustruct.other.JTextAreaEasy;
+import de.visustruct.view.CodeErzeuger;
 
 
 
@@ -47,8 +48,17 @@ public class StruktogrammElementListe extends ArrayList<StruktogrammElement> {//
 
 
 	public void quellcodeAllerUnterelementeGenerieren(int typ, int anzahlEingerueckt, int anzahlEinzuruecken, boolean alsKommentar, JTextAreaEasy textarea){
-		for (int i=0; i < size(); i++){
-			get(i).quellcodeGenerieren(typ, anzahlEingerueckt, anzahlEinzuruecken, alsKommentar, textarea);
+		if (typ == CodeErzeuger.typJava) {
+			CodeGenRules.enterJavaGenerationScope();
+		}
+		try {
+			for (int i=0; i < size(); i++){
+				get(i).quellcodeGenerieren(typ, anzahlEingerueckt, anzahlEinzuruecken, alsKommentar, textarea);
+			}
+		} finally {
+			if (typ == CodeErzeuger.typJava) {
+				CodeGenRules.leaveJavaGenerationScope();
+			}
 		}
 	}
 

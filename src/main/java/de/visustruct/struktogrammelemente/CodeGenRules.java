@@ -26,11 +26,109 @@ public final class CodeGenRules {
 			"\\b(?:final\\s+)?(?:byte|short|int|long|float|double|boolean|char|String)\\s*\\[\\s*\\]\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\b");
 	private static final Pattern JAVA_ARRAY_DECL_2 = Pattern.compile(
 			"\\b(?:final\\s+)?(?:byte|short|int|long|float|double|boolean|char|String)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\[\\s*\\]");
-	private static final Set<String> JAVA_ARRAY_LIKE_LENGTH_NAMES = Set.of(
-			"a", "a1", "a2", "arr", "arr1", "arr2", "array", "data", "feld", "i", "j", "k", "m", "n",
-			"nums", "werte", "zahlen", "student", "students");
+	/** Während der Java-Quelltext-Erzeugung: bereits deklarierte einfache Bezeichner (z. B. kein zweites {@code int} bei {@code input:}). */
+	private static final ThreadLocal<Integer> JAVA_SCOPE_DEPTH = new ThreadLocal<>();
+	private static final ThreadLocal<Set<String>> JAVA_DECLARED_NAMES = new ThreadLocal<>();
+	private static final Pattern JAVA_EMITTED_TYPED_ASSIGN = Pattern.compile(
+			"(?i)^\\s*(?:final\\s+)?(int|long|float|double|boolean|byte|short|char|String)(?:\\s*\\[\\s*\\])?\\s+([A-Za-z_$][\\w]*)\\s*=");
+	private static final Pattern JAVA_EMITTED_TYPED_ASSIGN_BRACKETS_AFTER = Pattern.compile(
+			"(?i)^\\s*(?:final\\s+)?(int|long|float|double|boolean|byte|short|char|String)\\s+([A-Za-z_$][\\w]*)\\s*\\[\\s*\\]\\s*=");
+	/** Während der JS-Quelltext-Erzeugung: für {@link #javaScriptIntegerDivisionIfNeeded} (Swift-Parität). */
+	private static final ThreadLocal<Set<String>> JS_INTEGER_VARIABLES = new ThreadLocal<>();
+
+	private static final Pattern MATH_RANDOM_NO_PARENS = Pattern.compile("(?i)\\bMath\\.random\\b(?!\\s*\\()");
+	private static final Pattern JS_INT_ASSIGN_DIV = Pattern
+			.compile("^\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*([A-Za-z_$][A-Za-z0-9_$]*|\\d+)\\s*/\\s*([A-Za-z_$][A-Za-z0-9_$]*|\\d+)\\s*$");
+	private static final Pattern JS_INT_DIV_EQ = Pattern.compile("^\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*/=\\s*([A-Za-z_$][A-Za-z0-9_$]*|\\d+)\\s*$");
+	private static final Pattern JS_INT_DECL_ASSIGN = Pattern
+			.compile("(?i)^\\s*(integer|int|long|short|byte)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=");
+	/** Struktogramm-Kurzschreibweisen ohne „=“: {@code zahl / 2}, Collatz {@code zahl * 3 + 1} / {@code 3 * zahl + 1}. */
+	private static final Pattern SHORTHAND_SELF_DIV = Pattern
+			.compile("^\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*/\\s*([A-Za-z_$][A-Za-z0-9_$]*|\\d+)\\s*$");
+	private static final Pattern SHORTHAND_VAR_MUL_ADD = Pattern
+			.compile("^\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\*\\s*(\\d+)\\s*\\+\\s*(\\d+)\\s*$");
+	private static final Pattern SHORTHAND_LIT_MUL_VAR_ADD = Pattern
+			.compile("^\\s*(\\d+)\\s*\\*\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\+\\s*(\\d+)\\s*$");
 
 	private CodeGenRules() {
+	}
+
+	/**
+	 * Vor {@code quellcodeAllerUnterelementeGenerieren(…, typJavaScript, …)} aufrufen, danach
+	 * {@link #endJavaScriptCodeGeneration()} in {@code finally}.
+	 */
+	public static void beginJavaScriptCodeGeneration(StruktogrammElementListe root) {
+		JS_INTEGER_VARIABLES.set(inferIntegerVariablesForJavaScript(root));
+	}
+
+	public static void endJavaScriptCodeGeneration() {
+		JS_INTEGER_VARIABLES.remove();
+	}
+
+	/**
+	 * Pro Wurzel-{@code quellcodeAllerUnterelementeGenerieren}-Lauf (verschachtelte Aufrufe per Zähler).
+	 * Ermittelt u. a. doppelte {@code int}-Deklarationen bei {@code input:} nach vorherigem {@code int zahl = …}.
+	 */
+	public static void enterJavaGenerationScope() {
+		Integer d = JAVA_SCOPE_DEPTH.get();
+		int n = d == null ? 0 : d;
+		if (n == 0) {
+			JAVA_DECLARED_NAMES.set(new HashSet<>());
+		}
+		JAVA_SCOPE_DEPTH.set(n + 1);
+	}
+
+	public static void leaveJavaGenerationScope() {
+		Integer d = JAVA_SCOPE_DEPTH.get();
+		if (d == null) {
+			return;
+		}
+		int n = d - 1;
+		if (n <= 0) {
+			JAVA_SCOPE_DEPTH.remove();
+			JAVA_DECLARED_NAMES.remove();
+		} else {
+			JAVA_SCOPE_DEPTH.set(n);
+		}
+	}
+
+	private static Set<String> currentJavaDeclaredNames() {
+		Set<String> s = JAVA_DECLARED_NAMES.get();
+		return s != null ? s : Set.of();
+	}
+
+	private static void registerJavaNamesFromEmitted(String block) {
+		Set<String> s = JAVA_DECLARED_NAMES.get();
+		if (s == null || block == null || block.isEmpty()) {
+			return;
+		}
+		for (String rawLine : block.split("\\R", -1)) {
+			String ln = rawLine.trim();
+			if (ln.isEmpty()) {
+				continue;
+			}
+			Matcher m1 = JAVA_EMITTED_TYPED_ASSIGN.matcher(ln);
+			if (m1.find()) {
+				s.add(m1.group(2));
+				continue;
+			}
+			Matcher m2 = JAVA_EMITTED_TYPED_ASSIGN_BRACKETS_AFTER.matcher(ln);
+			if (m2.find()) {
+				s.add(m2.group(2));
+			}
+		}
+	}
+
+	private static boolean javaVariableAlreadyDeclared(String simpleName) {
+		if (simpleName == null || simpleName.isEmpty()) {
+			return false;
+		}
+		return currentJavaDeclaredNames().contains(simpleName);
+	}
+
+	private static Set<String> currentJsIntegerVariables() {
+		Set<String> s = JS_INTEGER_VARIABLES.get();
+		return s != null ? s : Set.of();
 	}
 
 	public static String indent(String codeLine, int spaces) {
@@ -46,6 +144,9 @@ public final class CodeGenRules {
 			return "";
 		}
 		String translated = translateInstructionLine(line, target);
+		if (target == CodeErzeuger.typJava) {
+			registerJavaNamesFromEmitted(translated);
+		}
 		return indentMultiline(translated, indent);
 	}
 
@@ -90,6 +191,26 @@ public final class CodeGenRules {
 		String bareOutput = emitBareLeadingStringAsPrint(line, target);
 		if (bareOutput != null) {
 			return bareOutput;
+		}
+		if (target == CodeErzeuger.typJavaScript) {
+			String shortAssign = javaScriptShorthandSelfAssignIfNeeded(line, currentJsIntegerVariables());
+			if (shortAssign != null) {
+				return formatCStyleStatementLine(shortAssign);
+			}
+			String div = javaScriptIntegerDivisionIfNeeded(line, currentJsIntegerVariables());
+			if (div != null) {
+				return formatCStyleStatementLine(div);
+			}
+		} else if (target == CodeErzeuger.typJava) {
+			String shortAssign = javaShorthandSelfAssignIfNeeded(line);
+			if (shortAssign != null) {
+				return formatCStyleStatementLine(shortAssign);
+			}
+		} else if (target == CodeErzeuger.typPython) {
+			String shortAssign = pythonShorthandSelfAssignIfNeeded(line);
+			if (shortAssign != null) {
+				return shortAssign;
+			}
 		}
 		if (isCStyleTarget(target)) {
 			return formatCStyleStatementLine(line);
@@ -227,7 +348,15 @@ public final class CodeGenRules {
 		if (p.isIndexedTarget()) {
 			return p.name;
 		}
-		return p.type + " " + p.name;
+		String simple = p.name.replace(" ", "");
+		int lb = simple.indexOf('[');
+		if (lb >= 0) {
+			simple = simple.substring(0, lb);
+		}
+		if (javaVariableAlreadyDeclared(simple)) {
+			return p.name.replace(" ", "");
+		}
+		return p.type + " " + p.name.replace(" ", "");
 	}
 
 	private static String jsInputTarget(InputLineParse p) {
@@ -457,6 +586,179 @@ public final class CodeGenRules {
 				|| step.matches("\\s*" + Pattern.quote(var) + "\\s*\\+=\\s*1\\s*");
 	}
 
+	/** Wie Swift {@code inferIntegerVariablesForJavaScript}: für {@code Math.floor}-Division in JS. */
+	public static Set<String> inferIntegerVariablesForJavaScript(StruktogrammElementListe root) {
+		Set<String> out = new HashSet<>();
+		if (root != null) {
+			walkStruktogramForJsIntInference(root, out);
+		}
+		return out;
+	}
+
+	private static void walkStruktogramForJsIntInference(StruktogrammElementListe list, Set<String> out) {
+		for (StruktogrammElement e : list) {
+			for (String line : e.text) {
+				addFromStatementLineForJsInt(line, out);
+			}
+			if (e instanceof Schleife schleife) {
+				walkStruktogramForJsIntInference(schleife.gibListe(), out);
+			} else if (e instanceof Fallauswahl fall) {
+				for (StruktogrammElementListe sub : fall.listen) {
+					walkStruktogramForJsIntInference(sub, out);
+				}
+			}
+		}
+	}
+
+	private static void addFromStatementLineForJsInt(String raw, Set<String> set) {
+		String t = raw != null ? raw.trim() : "";
+		if (t.isEmpty()) {
+			return;
+		}
+		String lower = t.toLowerCase();
+		if (lower.startsWith("input:")) {
+			InputLineParse p = parseInputLine(t);
+			if (p != null && isDiagramIntegerType(p.type) && !p.isIndexedTarget()) {
+				set.add(p.name);
+			}
+			return;
+		}
+		Matcher constM = CONST_TYPED.matcher(stripTrailingSemicolon(t));
+		if (constM.matches() && isDiagramIntegerType(constM.group(1))) {
+			set.add(constM.group(2));
+			return;
+		}
+		Matcher decl = JS_INT_DECL_ASSIGN.matcher(t);
+		if (decl.find()) {
+			set.add(decl.group(2).trim());
+		}
+	}
+
+	private static boolean isDiagramIntegerType(String rawType) {
+		String x = rawType != null ? rawType.trim().toLowerCase() : "";
+		return x.equals("int") || x.equals("integer") || x.equals("long") || x.equals("short") || x.equals("byte");
+	}
+
+	/**
+	 * Wie Swift {@code javaScriptIntegerDivisionIfNeeded}: einfache {@code x = x / y} bzw. {@code x /= y} für
+	 * als Ganzzahl erkannte Variablen → {@code Math.floor}.
+	 */
+	static String javaScriptIntegerDivisionIfNeeded(String raw, Set<String> intVariables) {
+		if (intVariables == null || intVariables.isEmpty()) {
+			return null;
+		}
+		String t = stripTrailingSemicolon(raw).trim();
+		if (t.isEmpty()) {
+			return null;
+		}
+		Matcher assign = JS_INT_ASSIGN_DIV.matcher(t);
+		if (assign.matches()) {
+			String lhs = assign.group(1);
+			String a = assign.group(2);
+			String b = assign.group(3);
+			if (intVariables.contains(lhs) && lhs.equals(a)) {
+				return lhs + " = Math.floor(" + a + " / " + b + ")";
+			}
+			return null;
+		}
+		Matcher divEq = JS_INT_DIV_EQ.matcher(t);
+		if (divEq.matches()) {
+			String lhs = divEq.group(1);
+			String b = divEq.group(2);
+			if (intVariables.contains(lhs)) {
+				return lhs + " = Math.floor(" + lhs + " / " + b + ")";
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Diagrammzeilen ohne {@code =}: z. B. {@code zahl / 2} oder Collatz {@code zahl * 3 + 1} — werden zu gültigen
+	 * Zuweisungen (sonst kein Effekt im Browser/Interpreter).
+	 */
+	private static String javaScriptShorthandSelfAssignIfNeeded(String raw, Set<String> intVariables) {
+		String t = stripTrailingSemicolon(raw).trim();
+		if (t.isEmpty()) {
+			return null;
+		}
+		Matcher mDiv = SHORTHAND_SELF_DIV.matcher(t);
+		if (mDiv.matches()) {
+			String lhs = mDiv.group(1);
+			String rhs = mDiv.group(2);
+			if (intVariables != null && intVariables.contains(lhs)) {
+				return lhs + " = Math.floor(" + lhs + " / " + rhs + ")";
+			}
+			return lhs + " = " + lhs + " / " + rhs;
+		}
+		Matcher mMul = SHORTHAND_VAR_MUL_ADD.matcher(t);
+		if (mMul.matches()) {
+			String v = mMul.group(1);
+			return v + " = " + v + " * " + mMul.group(2) + " + " + mMul.group(3);
+		}
+		Matcher m3 = SHORTHAND_LIT_MUL_VAR_ADD.matcher(t);
+		if (m3.matches()) {
+			String v = m3.group(2);
+			return v + " = " + m3.group(1) + " * " + v + " + " + m3.group(3);
+		}
+		return null;
+	}
+
+	private static String javaShorthandSelfAssignIfNeeded(String raw) {
+		String t = stripTrailingSemicolon(raw).trim();
+		if (t.isEmpty()) {
+			return null;
+		}
+		Matcher mDiv = SHORTHAND_SELF_DIV.matcher(t);
+		if (mDiv.matches()) {
+			String lhs = mDiv.group(1);
+			return lhs + " = " + lhs + " / " + mDiv.group(2);
+		}
+		Matcher mMul = SHORTHAND_VAR_MUL_ADD.matcher(t);
+		if (mMul.matches()) {
+			String v = mMul.group(1);
+			return v + " = " + v + " * " + mMul.group(2) + " + " + mMul.group(3);
+		}
+		Matcher m3 = SHORTHAND_LIT_MUL_VAR_ADD.matcher(t);
+		if (m3.matches()) {
+			String v = m3.group(2);
+			return v + " = " + m3.group(1) + " * " + v + " + " + m3.group(3);
+		}
+		return null;
+	}
+
+	private static String pythonShorthandSelfAssignIfNeeded(String raw) {
+		String t = stripTrailingSemicolon(raw).trim();
+		if (t.isEmpty()) {
+			return null;
+		}
+		Matcher mDiv = SHORTHAND_SELF_DIV.matcher(t);
+		if (mDiv.matches()) {
+			String lhs = mDiv.group(1);
+			return lhs + " = " + lhs + " // " + mDiv.group(2);
+		}
+		Matcher mMul = SHORTHAND_VAR_MUL_ADD.matcher(t);
+		if (mMul.matches()) {
+			String v = mMul.group(1);
+			return v + " = " + v + " * " + mMul.group(2) + " + " + mMul.group(3);
+		}
+		Matcher m3 = SHORTHAND_LIT_MUL_VAR_ADD.matcher(t);
+		if (m3.matches()) {
+			String v = m3.group(2);
+			return v + " = " + m3.group(1) + " * " + v + " + " + m3.group(3);
+		}
+		return null;
+	}
+
+	private static String normalizeJavaScriptMathRandomCall(String s) {
+		Matcher m = MATH_RANDOM_NO_PARENS.matcher(s);
+		StringBuffer out = new StringBuffer();
+		while (m.find()) {
+			m.appendReplacement(out, "Math.random()");
+		}
+		m.appendTail(out);
+		return out.toString();
+	}
+
 	private static String replaceIdentifierDotLengthWithParensInJava(String code) {
 		Set<String> arrayNames = javaArrayDeclarationNames(code);
 		Matcher m = JAVA_LENGTH.matcher(code);
@@ -464,9 +766,7 @@ public final class CodeGenRules {
 		while (m.find()) {
 			String id = m.group(1);
 			String lower = id.toLowerCase();
-			String replacement = JAVA_ARRAY_LIKE_LENGTH_NAMES.contains(lower) || arrayNames.contains(lower)
-					? m.group(0)
-					: id + ".length()";
+			String replacement = arrayNames.contains(lower) ? m.group(0) : id + ".length()";
 			m.appendReplacement(out, Matcher.quoteReplacement(replacement));
 		}
 		m.appendTail(out);
@@ -500,7 +800,7 @@ public final class CodeGenRules {
 		if (cast.matches()) {
 			return "Math.floor(" + javaScriptRhsFromJavaRhs(cast.group(1), false) + ")";
 		}
-		return t;
+		return normalizeJavaScriptMathRandomCall(t);
 	}
 
 	private static String pythonRhsFromJavaRhs(String rhs, boolean array) {

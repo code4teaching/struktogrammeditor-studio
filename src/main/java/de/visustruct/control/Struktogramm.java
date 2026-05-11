@@ -833,10 +833,25 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 				tmp.entfernen(zuLoeschen); //das Element wird entfernt
 			}
 
+			if (zuLoeschen == markiertesElement) {
+				elementAuswaehlen(null);
+			}
+
 			zeichenbereichAktualisieren();
 			zeichne();
 			rueckgaengigPunktSetzen();
 		}
+	}
+
+	/**
+	 * Löscht das gelb markierte Element mit Bestätigungsdialog (wie Kontextmenü „Löschen“).
+	 * Platzhalter-LeerElemente werden wie im Kontextmenü nicht gelöscht.
+	 */
+	public void markiertesElementLoeschen() {
+		if (markiertesElement == null || markiertesElement instanceof LeerElement) {
+			return;
+		}
+		elementLoeschen(markiertesElement, true);
 	}
 
 

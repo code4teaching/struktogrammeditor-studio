@@ -1,6 +1,7 @@
 package de.visustruct.view;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
@@ -22,6 +23,9 @@ import java.awt.dnd.DropTargetDragEvent;
 import java.awt.dnd.DropTargetDropEvent;
 import java.awt.dnd.DropTargetEvent;
 import java.awt.dnd.DropTargetListener;
+
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -107,7 +111,17 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		muelleimerAuf(!muelleimerIstAuf);
 		muelleimer.setHorizontalAlignment(SwingConstants.CENTER);
 		muelleimer.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
-		muelleimer.setToolTipText(I18n.tr("palette.trashDrop"));
+		muelleimer.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		muelleimerTooltipSetzen();
+		muelleimer.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent e) {
+				if (!SwingUtilities.isLeftMouseButton(e)) {
+					return;
+				}
+				controlling.gibAktuellesStruktogramm().markiertesElementLoeschen();
+			}
+		});
 		add(muelleimer, c);
 
 		c.gridy++;
@@ -168,7 +182,7 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 	
 	
 	public void aktualisiereBeschriftungen(){
-		muelleimer.setToolTipText(I18n.tr("palette.trashDrop"));
+		muelleimerTooltipSetzen();
 		if (palettePngButton != null) {
 			palettePngButton.setText(I18n.tr("palette.exportPng"));
 		}
@@ -208,6 +222,10 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 	}
 
 
+
+	private void muelleimerTooltipSetzen() {
+		muelleimer.setToolTipText("<html>" + I18n.tr("palette.trashDrop") + "<br>" + I18n.tr("palette.trashClick") + "</html>");
+	}
 
 	private void muelleimerAuf(boolean oeffnen){
 		if (muelleimerIstAuf != oeffnen){

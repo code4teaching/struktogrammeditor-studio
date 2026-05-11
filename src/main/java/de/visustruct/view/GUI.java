@@ -134,7 +134,7 @@ public class GUI extends JFrame implements Konstanten{
 			menu.add(new JSeparator());
 			menu.add(createMenuItem(I18n.tr("menu.file.generateCode"), XActionCommands.quellcodeErzeugen, KeyEvent.VK_G));
 			menu.add(new JSeparator());
-			menu.add(createMenuItem(I18n.tr("menu.file.closeDiagram"), XActionCommands.struktogrammSchliessen, KeyEvent.VK_C));
+			menu.add(createMenuItem(I18n.tr("menu.file.closeDiagram"), XActionCommands.struktogrammSchliessen, KeyEvent.VK_C, KeyEvent.VK_W));
 			menu.add(new JSeparator());
 			menu.add(createMenuItem(I18n.tr("menu.file.about"), XActionCommands.info, KeyEvent.VK_B));
 			menu.add(new JSeparator());

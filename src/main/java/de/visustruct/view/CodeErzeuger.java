@@ -366,24 +366,32 @@ public class CodeErzeuger extends JDialog {
 			final int einrueckungProStufe = numberfieldZeichenzahl.getInt();
 			final boolean alsKommentar = checkboxKommentare.isSelected();
 			boolean batchBeendet = false;
+			final boolean javaScriptGen = typ == typJavaScript;
 			try {
-				if (typ == typJavaScript) {
+				if (javaScriptGen) {
 					textarea.hinzufuegen("\"use strict\";\n\n");
+					CodeGenRules.beginJavaScriptCodeGeneration(str.gibListe());
 				}
-				str.gibListe().quellcodeAllerUnterelementeGenerieren(typ, einrueckung, einrueckungProStufe, alsKommentar, textarea);
-				textarea.endQuellcodeBatch();
-				batchBeendet = true;
-				if (typ == typJava) {
-					String code = javaCodeNachbearbeiten(textarea.gibText(), einrueckungProStufe);
-					textarea.leeren();
-					textarea.hinzufuegen(code);
-				} else {
-					String code = CodeGenRules.postProcessGeneratedCode(textarea.gibText(), typ);
-					if (typ == typPython && CodeGenRules.pythonNeedsRandomImport(code)) {
-						code = "import random\n\n" + code;
+				try {
+					str.gibListe().quellcodeAllerUnterelementeGenerieren(typ, einrueckung, einrueckungProStufe, alsKommentar, textarea);
+					textarea.endQuellcodeBatch();
+					batchBeendet = true;
+					if (typ == typJava) {
+						String code = javaCodeNachbearbeiten(textarea.gibText(), einrueckungProStufe);
+						textarea.leeren();
+						textarea.hinzufuegen(code);
+					} else {
+						String code = CodeGenRules.postProcessGeneratedCode(textarea.gibText(), typ);
+						if (typ == typPython && CodeGenRules.pythonNeedsRandomImport(code)) {
+							code = "import random\n\n" + code;
+						}
+						textarea.leeren();
+						textarea.hinzufuegen(code);
 					}
-					textarea.leeren();
-					textarea.hinzufuegen(code);
+				} finally {
+					if (javaScriptGen) {
+						CodeGenRules.endJavaScriptCodeGeneration();
+					}
 				}
 			} finally {
 				if (!batchBeendet) {
