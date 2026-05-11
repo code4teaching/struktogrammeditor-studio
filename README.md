@@ -22,6 +22,14 @@ git clone https://github.com/code4teaching/VisuStruct.git
 
 ---
 
+## Changes in 1.1.3 (summary)
+
+- **Tabs:** close tabs via middle-click, context menu, and **Ctrl+W** / **Cmd+W**; clicking the tab header switches diagrams reliably (close “×” is a label, not a button).
+- **Palette / trash:** **left-click** deletes the **selected** (highlighted) block with the same confirmation as context-menu **Delete**; drag-to-trash unchanged.
+- **Code generator:** **Java scope** and **`CodeGenRules`** updates (`StruktogrammElementListe`, `CodeErzeuger`, and related).
+
+Full notes: [`release-notes/v1.1.3.md`](release-notes/v1.1.3.md).
+
 ## Changes in 1.1.2 (summary)
 
 - **Diagram canvas (light theme):** styling aligned with [VisuStruct-SwiftUI](https://github.com/code4teaching/VisuStruct-SwiftUI): black block borders (2 px), outer frame inset 16 px, content inset 28 px, selection as blue outline (no blue fill).
@@ -111,7 +119,7 @@ This release aligns **branding and technical identity** with **VisuStruct**. **`
 - **Java 17** target (build and run with JDK 17+).
 - **FlatLaf** light/dark themes; **JDOM2**; no legacy AppleJavaExtensions.
 - **Motif** look-and-feel removed; **Metal** and FlatLaf available.
-- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.1.2.jar`**).
+- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.1.3.jar`**).
 
 ---
 
@@ -186,13 +194,13 @@ chmod +x mvnw
 Output (version from `pom.xml`):
 
 ```text
-target/visustruct-1.1.2.jar
+target/visustruct-1.1.3.jar
 ```
 
 ## Run
 
 ```bash
-java -jar target/visustruct-1.1.2.jar
+java -jar target/visustruct-1.1.3.jar
 ```
 
 Double-click may work if `.jar` is associated with Java.
