@@ -3,6 +3,7 @@ package de.visustruct.other;
 public enum XActionCommands {
 	neu, oeffnen, speichern, speicherUnter, bildSpeichern, bildDrucken, bildInZwischenAblage, quellcodeErzeugen,
 	struktogrammSchliessen, programmBeenden,
+	simulationToggle,
 	
 	rueckgaengig, widerrufen, ganzesStruktogrammKopieren,
 	

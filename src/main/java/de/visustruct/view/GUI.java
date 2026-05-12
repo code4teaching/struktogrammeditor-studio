@@ -21,14 +21,17 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JPanel;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
 import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
+import java.awt.CardLayout;
 import de.visustruct.control.Controlling;
 import de.visustruct.control.GlobalSettings;
 import de.visustruct.control.Konstanten;
@@ -44,6 +47,22 @@ public class GUI extends JFrame implements Konstanten{
 	private AuswahlPanel auswahlPanel; //Panel an der linken Seite, wo die Labels zu finden sind, von denen man neue StruktogrammElemente in das Struktogramm ziehen kann
 	private StrTabbedPane tabbedpane; //TabbedPane, in dem die Struktogramme sind  
 	private ElementEditorPanel elementEditorPanel;
+	private SimulationPanel simulationPanel;
+	/** Diagramm + Elementeditor im normalen Modus. */
+	private JSplitPane editorSplit;
+	/** Während Simulation: Platzhalter im oberen Teil (TabbedPane liegt im Simulations-Split). */
+	private final JPanel editorDiagramPlaceholder = new JPanel();
+	/** Während Simulation: unterer Teil des Editor-Splits (Inspektor ist ausgeparkt). */
+	private final JPanel editorInspectorPlaceholder = new JPanel();
+	/** Hält den {@link ElementEditorPanel} ohne Anzeige im Fenster, solange die Simulation aktiv ist. */
+	private final JPanel inspectorParking = new JPanel(new BorderLayout());
+	/** Linker Bereich der Simulations-Ansicht (Diagramm). */
+	private final JPanel simulationLeftHost = new JPanel(new BorderLayout());
+	private JSplitPane simulationDiagramSplit;
+	private JPanel simulationCard;
+	private JPanel centerStack;
+	private final CardLayout centerCardLayout = new CardLayout();
+	private JMenuItem editSimulationMenuItem;
 	private Controlling controlling;
 	private final JMenuBar menubar;
 
@@ -84,14 +103,32 @@ public class GUI extends JFrame implements Konstanten{
 		paletteScroll.setBorder(BorderFactory.createEmptyBorder());
 		java.awt.Color vp = UIManager.getColor(VisuStructTheme.KEY_PALETTE_BACKGROUND);
 		paletteScroll.getViewport().setBackground(vp != null ? vp : UIManager.getColor("Panel.background"));
-		JSplitPane editorSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tabbedpane, elementEditorPanel);
+		editorSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tabbedpane, elementEditorPanel);
 		editorSplit.setResizeWeight(1.0);
 		editorSplit.setDividerLocation(460);
 		editorSplit.setDividerSize(5);
 		editorSplit.setContinuousLayout(true);
 		editorSplit.setBorder(BorderFactory.createEmptyBorder());
 
-		JSplitPane splitpane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, paletteScroll, editorSplit);
+		JPanel editorCard = new JPanel(new BorderLayout());
+		editorCard.add(editorSplit, BorderLayout.CENTER);
+
+		simulationPanel = new SimulationPanel(controlling);
+		simulationDiagramSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, simulationLeftHost, simulationPanel);
+		simulationDiagramSplit.setResizeWeight(0.68);
+		simulationDiagramSplit.setDividerSize(6);
+		simulationDiagramSplit.setContinuousLayout(true);
+		simulationDiagramSplit.setOneTouchExpandable(true);
+		simulationDiagramSplit.setBorder(BorderFactory.createEmptyBorder());
+
+		simulationCard = new JPanel(new BorderLayout());
+		simulationCard.add(simulationDiagramSplit, BorderLayout.CENTER);
+
+		centerStack = new JPanel(centerCardLayout);
+		centerStack.add(editorCard, "editor");
+		centerStack.add(simulationCard, "simulation");
+
+		JSplitPane splitpane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, paletteScroll, centerStack);
 		splitpane.setOneTouchExpandable(true);
 		splitpane.setDividerLocation(288);
 		splitpane.setDividerSize(5);
@@ -130,6 +167,9 @@ public class GUI extends JFrame implements Konstanten{
 		menubar.removeAll();
 		buildMenuBar();
 		menubar.revalidate();
+		if (simulationPanel != null) {
+			simulationPanel.refreshLocalizedTexts();
+		}
 	}
 
 	private void buildMenuBar() {
@@ -164,6 +204,12 @@ public class GUI extends JFrame implements Konstanten{
 			menu.add(createMenuItem(I18n.tr("menu.edit.caption"), XActionCommands.struktogrammbeschreibungHinzufuegen, KeyEvent.VK_T));
 			menu.add(new JSeparator());
 			menu.add(createMenuItem(I18n.tr("menu.edit.copyDiagram"), XActionCommands.ganzesStruktogrammKopieren, KeyEvent.VK_Y));
+			menu.add(new JSeparator());
+			String simLabel = controlling.isSimulationMode()
+					? I18n.tr("menu.edit.diagramMode")
+					: I18n.tr("menu.edit.simulation");
+			editSimulationMenuItem = createMenuItem(simLabel, XActionCommands.simulationToggle, KeyEvent.VK_I);
+			menu.add(editSimulationMenuItem);
 		}
 		menubar.add(menu);
 
@@ -355,6 +401,57 @@ public class GUI extends JFrame implements Konstanten{
 
 	public AuswahlPanel gibAuswahlPanel(){
 		return auswahlPanel;
+	}
+
+	public SimulationPanel getSimulationPanel() {
+		return simulationPanel;
+	}
+
+	/** Text des Menüeintrags „Simulation“ / „Diagramm …“. */
+	public void setEditSimulationMenuText(String text) {
+		if (editSimulationMenuItem != null) {
+			editSimulationMenuItem.setText(text);
+		}
+	}
+
+	public void showEditorCard() {
+		if (tabbedpane.getParent() == simulationLeftHost) {
+			simulationLeftHost.remove(tabbedpane);
+			editorSplit.setTopComponent(tabbedpane);
+		}
+		restoreInspectorAfterSimulation();
+		centerCardLayout.show(centerStack, "editor");
+		editorSplit.revalidate();
+		tabbedpane.revalidate();
+	}
+
+	public void showSimulationCard() {
+		if (tabbedpane.getParent() == editorSplit) {
+			editorSplit.setTopComponent(editorDiagramPlaceholder);
+			parkInspectorForSimulation();
+			simulationLeftHost.add(tabbedpane, BorderLayout.CENTER);
+			simulationLeftHost.revalidate();
+		}
+		centerCardLayout.show(centerStack, "simulation");
+		simulationDiagramSplit.revalidate();
+		tabbedpane.revalidate();
+		SwingUtilities.invokeLater(() -> simulationDiagramSplit.setDividerLocation(0.68));
+	}
+
+	/** Inspektor aus dem Editor-Split nehmen (kein Platz / keine Anzeige im Simulationsmodus). */
+	private void parkInspectorForSimulation() {
+		if (elementEditorPanel.getParent() == editorSplit) {
+			editorSplit.setBottomComponent(editorInspectorPlaceholder);
+			inspectorParking.removeAll();
+			inspectorParking.add(elementEditorPanel, BorderLayout.CENTER);
+		}
+	}
+
+	private void restoreInspectorAfterSimulation() {
+		if (elementEditorPanel.getParent() == inspectorParking) {
+			inspectorParking.remove(elementEditorPanel);
+			editorSplit.setBottomComponent(elementEditorPanel);
+		}
 	}
 
 

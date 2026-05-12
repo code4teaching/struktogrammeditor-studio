@@ -4,12 +4,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>de.visustruct</groupId>
 	<artifactId>visustruct</artifactId>
-	<version>1.1.4</version>
+	<version>1.2.0</version>
 	<name>VisuStruct</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.release>17</maven.compiler.release>
+		<kotlin.version>2.0.21</kotlin.version>
 	</properties>
 
 	<scm>
@@ -34,6 +35,17 @@
 			<artifactId>flatlaf-extras</artifactId>
 			<version>3.7.1</version>
 		</dependency>
+		<dependency>
+			<groupId>org.jetbrains.kotlin</groupId>
+			<artifactId>kotlin-stdlib</artifactId>
+			<version>${kotlin.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>5.10.2</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -57,6 +69,38 @@
 			</resource>
 		</resources>
 		<plugins>
+			<!-- Kotlin vor Java kompilieren (Java darf Kotlin-APIs nutzen). -->
+			<plugin>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-maven-plugin</artifactId>
+				<version>${kotlin.version}</version>
+				<executions>
+					<execution>
+						<id>compile</id>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+						<phase>process-sources</phase>
+					</execution>
+					<execution>
+						<id>test-compile</id>
+						<goals>
+							<goal>test-compile</goal>
+						</goals>
+						<phase>test-compile</phase>
+					</execution>
+				</executions>
+				<configuration>
+					<jvmTarget>17</jvmTarget>
+					<!-- Explizite Pfade: Default-Erkennung lieferte in diesem Projekt „No sources“ (z. B. # im Pfad). -->
+					<sourceDirs>
+						<sourceDir>src/main/kotlin</sourceDir>
+					</sourceDirs>
+					<testSourceDirs>
+						<testSourceDir>src/test/kotlin</testSourceDir>
+					</testSourceDirs>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>

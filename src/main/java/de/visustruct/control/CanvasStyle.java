@@ -32,6 +32,7 @@ public final class CanvasStyle {
 	private static Color dropPreview;
 	private static Color dragFrame;
 	private static Color elementFill;
+	private static Color simulationStepHighlightFill;
 
 	private CanvasStyle() {
 	}
@@ -54,6 +55,7 @@ public final class CanvasStyle {
 		dropPreview = new Color(0x803B82F6, true);
 		dragFrame = new Color(0x3B82F6);
 		elementFill = Color.WHITE;
+		simulationStepHighlightFill = new Color(0xBFDBFE);
 	}
 
 	/** Zeichenfläche spürbar dunkler; Blöcke bleiben hell genug für Lesbarkeit. */
@@ -69,6 +71,7 @@ public final class CanvasStyle {
 		dropPreview = new Color(0x805B9FFF, true);
 		dragFrame = new Color(0x5B9FFF);
 		elementFill = new Color(0xECECF0);
+		simulationStepHighlightFill = new Color(0x1E3A5F);
 	}
 
 	private static boolean isFlatDarkTheme() {
@@ -127,5 +130,10 @@ public final class CanvasStyle {
 	/** Füllfarbe der Blöcke (nicht markiert). */
 	public static Color getElementFill() {
 		return elementFill;
+	}
+
+	/** Hintergrund für den aktuellen Simulations-Schritt im Diagramm. */
+	public static Color getSimulationStepHighlightFill() {
+		return simulationStepHighlightFill;
 	}
 }

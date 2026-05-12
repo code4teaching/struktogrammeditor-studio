@@ -205,6 +205,11 @@ public class ElementEditorPanel extends JPanel {
 		struktogramm.elementTextAusEditorSetzen(element, text.split("\\R", -1));
 	}
 
+	/** Wie der Button „Text übernehmen“: Editorinhalt ins markierte Element schreiben (z. B. vor Simulation). */
+	public void applyPendingTextToDiagram() {
+		applyText();
+	}
+
 	private void addCaseToSwitch() {
 		if (updating || struktogramm == null || !(element instanceof Fallauswahl) || element instanceof Verzweigung) {
 			return;

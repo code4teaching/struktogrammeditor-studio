@@ -410,6 +410,7 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
       if (index < 0 || index >= getTabCount()) {
          return;
       }
+      controlling.leaveSimulationMode();
       if (!isTabTitleDirty(index)) {
          removeTabEnsureMinimum(index);
          return;
@@ -490,7 +491,9 @@ public class StrTabbedPane extends JTabbedPane implements ChangeListener{
    
    
    public void stateChanged(ChangeEvent e){
+	   controlling.onStruktogrammTabChanged();
 	   controlling.titelleisteAktualisieren();
+	   SwingUtilities.invokeLater(() -> controlling.getGUI().gibAuswahlPanel().aktualisiereBeschriftungen());
    }
    
    

@@ -19,6 +19,8 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 	protected String[] text; //Textzeilen, die im Kopfbereich des jeweiligen StruktogrammElementes angzeigt werden
 	protected Rectangle bereich; //Koordinaten, Breite und Hoehe des jeweiligen StruktogrammElemente
 	protected boolean markiert; // aktive Kachel: wie SwiftUI blauer Rand (ohne Blaufüllung)
+	/** Simulationsmodus: Schritt-Hervorhebung im Diagramm (unabhängig von {@link #markiert}). */
+	protected boolean simulationSpotlight;
 	protected Graphics2D g; //Graphics-Kontext des BufferedImage bild des Struktogramms
 	protected static final int vorschauHoehe = 20; //Höhe des roten Vorschau-Rechteckes
 	private int obererRand; //verändert sich je nach Anzahl der Textzeilen
@@ -36,6 +38,7 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 
 		bereich = new Rectangle();
 		markiert = false;
+		simulationSpotlight = false;
 		elementfarbenExplizit = false;
 		setzeText("");
 		
@@ -200,6 +203,14 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 		this.markiert = markiert;
 	}
 
+	public void setzeSimulationSpotlight(boolean simulationSpotlight) {
+		this.simulationSpotlight = simulationSpotlight;
+	}
+
+	public boolean istSimulationSpotlight() {
+		return simulationSpotlight;
+	}
+
 	public boolean istMarkiert(){
 		return markiert;
 	}
@@ -349,7 +360,11 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 		Stroke alt = g.getStroke();
 		try {
 			g.setStroke(new BasicStroke(CanvasStyle.DIAGRAM_LINE_WIDTH));
-			g.setColor(getFarbeHintergrund());
+			Color fill = getFarbeHintergrund();
+			if (simulationSpotlight) {
+				fill = CanvasStyle.getSimulationStepHighlightFill();
+			}
+			g.setColor(fill);
 			g.fillRect(gibX(), gibY(), gibBreite(), gibHoehe());
 			g.setColor(CanvasStyle.getElementBorder());
 			g.drawRect(gibX(), gibY(), gibBreite(), gibHoehe());

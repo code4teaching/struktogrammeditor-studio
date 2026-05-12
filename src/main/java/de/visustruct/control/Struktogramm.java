@@ -36,6 +36,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,6 +52,9 @@ import org.jdom2.output.Format;
 import org.jdom2.output.XMLOutputter;
 
 import de.visustruct.i18n.I18n;
+import de.visustruct.simulation.SimulationDocumentJdom;
+import de.visustruct.simulation.codec.XmlDecodeException;
+import de.visustruct.simulation.model.SimulationDocument;
 import de.visustruct.struktogrammelemente.Anweisung;
 import de.visustruct.struktogrammelemente.Aufruf;
 import de.visustruct.struktogrammelemente.Aussprung;
@@ -78,6 +82,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	private StruktogrammElementListe liste; //Hauptliste, die alle weiteren Unterelemente hat
 	private Graphics2D g; //Graphics des BufferedImage bild
 	private StruktogrammElement markiertesElement; //das mit der Maus markierte Element
+	private StruktogrammElement simulationSpotlightElement;
 	private BufferedImage bild; //hierauf zeichnen sich die StruktogrammElemente, anschließend wird alles auf das Struktogramm (also das JPanel) gezeichnet -> DoubleBuffering
 	private int sperre = 0; //laufender int-Wert für entlasten der CPU (siehe auch nächste Zeile und mausBewegt(...))
 	private static final int sperreAktualisierung = 0; // früher z. B. 10: seltener neuzeichnen bei MouseMoved (CPU); aktuell jedes Mal
@@ -218,6 +223,58 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 	public StruktogrammElementListe gibListe(){
 		return liste;
+	}
+
+	/**
+	 * Liefert das Struktogramm-Element zum Simulations-Pfad (Indices wie in {@code SimulationEngine}),
+	 * oder {@code null} bei ungültigem Pfad.
+	 */
+	public StruktogrammElement elementFuerSimulationPfadSuchen(List<Integer> path) {
+		if (path == null || path.isEmpty()) {
+			return null;
+		}
+		StruktogrammElementListe list = liste;
+		int pi = 0;
+		while (pi < path.size()) {
+			int idx = path.get(pi++);
+			if (idx < 0 || idx >= list.size()) {
+				return null;
+			}
+			StruktogrammElement el = list.get(idx);
+			if (pi >= path.size()) {
+				return el;
+			}
+			if (el instanceof Fallauswahl fa) {
+				int col = path.get(pi++);
+				if (col < 0 || col >= fa.gibAnzahlListen()) {
+					return null;
+				}
+				list = fa.gibListe(col);
+			} else if (el instanceof Schleife sch) {
+				list = sch.gibListe();
+			} else {
+				return null;
+			}
+		}
+		return null;
+	}
+
+	/** Hebt höchstens ein Element im Diagramm hervor (Simulationsmodus). {@code null} oder leer = aus. */
+	public void setzeSimulationSpotlightPfad(List<Integer> path) {
+		if (simulationSpotlightElement != null) {
+			simulationSpotlightElement.setzeSimulationSpotlight(false);
+			simulationSpotlightElement = null;
+		}
+		if (path == null || path.isEmpty()) {
+			zeichne();
+			return;
+		}
+		StruktogrammElement el = elementFuerSimulationPfadSuchen(path);
+		if (el != null) {
+			el.setzeSimulationSpotlight(true);
+			simulationSpotlightElement = el;
+		}
+		zeichne();
 	}
 
 	public Graphics2D gibGraphics(){
@@ -973,11 +1030,6 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 		return alsBilddateiSpeichernMitFiltern(voreingestellterPfad, new int[] { 7, 6, 5, 4, 3 });
 	}
 
-	/** Nur PNG — für die Schaltfläche „Export PNG“. */
-	public String alsBilddateiSpeichernNurPng(String voreingestellterPfad){
-		return alsBilddateiSpeichernMitFiltern(voreingestellterPfad, new int[] { 7 });
-	}
-
 	private String alsBilddateiSpeichernMitFiltern(String voreingestellterPfad, int[] bildFilterNummern){
 
 		String pfad = saveFileChooser(bildFilterNummern, voreingestellterPfad, true);
@@ -1089,6 +1141,16 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 		liste.schreibeXMLDatenAllerUnterElemente(element);
 
 		return myDocument;
+	}
+
+	/**
+	 * Aktueller Diagrammzustand als Kotlin-Simulationsmodell — dieselbe XML-Quelle wie Speichern und Rückgängig ({@link #xmlErstellen()}).
+	 * Für eine spätere Simulation / Swift-Parität; verändert den Editor nicht.
+	 *
+	 * @throws XmlDecodeException wenn der Kotlin-Decoder die erzeugte XML-Struktur nicht lesen kann
+	 */
+	public SimulationDocument toSimulationDocument() throws XmlDecodeException {
+		return SimulationDocumentJdom.fromStruktogrammDocument(xmlErstellen());
 	}
 
 

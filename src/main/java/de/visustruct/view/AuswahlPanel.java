@@ -55,8 +55,8 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 
 	private static final long serialVersionUID = 3619714917985247680L;
 	private AuswahlPanelElement[] panelElemente = new AuswahlPanelElement[9]; //9 StruktogrammElemente stehen zur Auswahl
-	private JButton palettePngButton;
 	private JButton paletteCodeGenButton;
+	private JButton paletteSimulationButton;
 	private JButton paletteInfoButton;
 	private DragSource dragSource;
 	private JButton muelleimer;
@@ -123,7 +123,16 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		add(muelleimer, c);
 
 		c.gridy++;
+		paletteSimulationButton = paletteAktionsButton(I18n.tr("menu.edit.simulation"));
+		wendePaletteAktionsIconAn(paletteSimulationButton, "circle-play");
+		paletteSimulationButton.setToolTipText(I18n.tr("palette.simulation.tooltip"));
+		paletteSimulationButton.getAccessibleContext().setAccessibleName(I18n.tr("menu.edit.simulation"));
+		paletteSimulationButton.addActionListener(e -> controlling.toggleSimulationFromUi());
+		add(paletteSimulationButton, c);
+
+		c.gridy++;
 		paletteCodeGenButton = paletteAktionsButton(I18n.tr("palette.generateCode"));
+		wendePaletteAktionsIconAn(paletteCodeGenButton, "code");
 		paletteCodeGenButton.setToolTipText(I18n.tr("menu.file.generateCode"));
 		paletteCodeGenButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.generateCode"));
 		paletteCodeGenButton.addActionListener(e -> new CodeErzeuger(controlling.getGUI(),
@@ -133,12 +142,8 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		c.gridy++;
 		c.insets = new Insets(1, 0, 3, 0);
 
-		palettePngButton = paletteAktionsButton(I18n.tr("palette.exportPng"));
-		palettePngButton.addActionListener(e -> controlling.bildSpeichernNurPng());
-		add(palettePngButton, c);
-		c.gridy++;
-
 		paletteInfoButton = paletteAktionsButton(I18n.tr("palette.aboutVisuStruct"));
+		wendePaletteAktionsIconAn(paletteInfoButton, "info");
 		paletteInfoButton.setToolTipText(I18n.tr("palette.aboutTooltip"));
 		paletteInfoButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.aboutVisuStruct"));
 		paletteInfoButton.addActionListener(e -> controlling.showInfo());
@@ -169,6 +174,19 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		b.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
 		PaletteButtonStyle.apply(b);
 		return b;
+	}
+
+	/**
+	 * Lucide-Icons (Swift/SF Symbols: play.circle, code, info.circle).
+	 */
+	private static void wendePaletteAktionsIconAn(JButton b, String lucideDateiname) {
+		FlatSVGIcon icon = new FlatSVGIcon("icons/lucide/" + lucideDateiname + ".svg", 18, 18);
+		b.setIcon(icon);
+		b.setMargin(new Insets(4, 10, 4, 10));
+		b.setVerticalTextPosition(SwingConstants.CENTER);
+		b.setHorizontalTextPosition(SwingConstants.RIGHT);
+		b.setHorizontalAlignment(SwingConstants.LEFT);
+		b.setIconTextGap(10);
 	}
 
 	/** Löschen: wie andere Paletten-Aktionen als Button, rot für destruktive Aktion. */
@@ -209,20 +227,32 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 	
 	
 	public void aktualisiereBeschriftungen(){
+		boolean sim = controlling.isSimulationMode();
+		for (AuswahlPanelElement el : panelElemente) {
+			el.setEnabled(!sim);
+		}
 		muelleimer.setText(I18n.tr("palette.deleteElement"));
 		muelleimer.getAccessibleContext().setAccessibleName(I18n.tr("palette.deleteElement"));
 		muelleimer.setForeground(paletteTrashBaseColor());
 		muelleimerTooltipSetzen();
 		muelleimerIconZumAktuellenZustand();
+		muelleimer.setEnabled(!sim);
+		if (paletteSimulationButton != null) {
+			boolean hasTab = controlling.getGUI().gibTabbedpane().getTabCount() > 0;
+			paletteSimulationButton.setEnabled(hasTab);
+			paletteSimulationButton.setText(sim ? I18n.tr("menu.edit.diagramMode") : I18n.tr("menu.edit.simulation"));
+			paletteSimulationButton.setToolTipText(I18n.tr("palette.simulation.tooltip"));
+			paletteSimulationButton.getAccessibleContext().setAccessibleName(
+					sim ? I18n.tr("menu.edit.diagramMode") : I18n.tr("menu.edit.simulation"));
+		}
 		if (paletteCodeGenButton != null) {
+			paletteCodeGenButton.setEnabled(!sim);
 			paletteCodeGenButton.setText(I18n.tr("palette.generateCode"));
 			paletteCodeGenButton.setToolTipText(I18n.tr("menu.file.generateCode"));
 			paletteCodeGenButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.generateCode"));
 		}
-		if (palettePngButton != null) {
-			palettePngButton.setText(I18n.tr("palette.exportPng"));
-		}
 		if (paletteInfoButton != null) {
+			paletteInfoButton.setEnabled(!sim);
 			paletteInfoButton.setText(I18n.tr("palette.aboutVisuStruct"));
 			paletteInfoButton.setToolTipText(I18n.tr("palette.aboutTooltip"));
 			paletteInfoButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.aboutVisuStruct"));

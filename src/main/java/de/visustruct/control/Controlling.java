@@ -48,6 +48,9 @@ import de.visustruct.view.UiTheme;
 import de.visustruct.i18n.I18n;
 import de.visustruct.other.Helpers;
 import de.visustruct.other.XActionCommands;
+import de.visustruct.simulation.SimulationEngine;
+import de.visustruct.simulation.codec.XmlDecodeException;
+import de.visustruct.simulation.model.SimulationDocument;
 import de.visustruct.struktogrammelemente.StruktogrammElement;
 import de.visustruct.view.AuswahlPanel;
 import de.visustruct.view.CodeErzeuger;
@@ -61,6 +64,7 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 	private static final Logger LOG = Logger.getLogger(Controlling.class.getName());
 
 	private GUI gui;
+	private boolean simulationMode;
 	private enum Betriebssysteme {Windows, Mac, Linux};
 
 	public Controlling(String[] params){
@@ -181,6 +185,9 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 
 
 	public Struktogramm gibAktuellesStruktogramm(){
+		if (gui == null) {
+			return null;
+		}
 		return gui.gibTabbedpane().gibAktuellesStruktogramm();
 	}
 
@@ -271,15 +278,6 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 
 		if(str != null){
 			GlobalSettings.setzeBildSpeicherpfad(str.alsBilddateiSpeichern(GlobalSettings.getZuletztGenutzterPfadFuerBild()));
-			GlobalSettings.saveSettings();
-		}
-	}
-
-	public void bildSpeichernNurPng(){
-		Struktogramm str = gibAktuellesStruktogramm();
-
-		if(str != null){
-			GlobalSettings.setzeBildSpeicherpfad(str.alsBilddateiSpeichernNurPng(GlobalSettings.getZuletztGenutzterPfadFuerBild()));
 			GlobalSettings.saveSettings();
 		}
 	}
@@ -460,6 +458,10 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 			addStruktogrammbeschriftung();
 			break;
 
+		case simulationToggle:
+			onSimulationToggle();
+			break;
+
 		}
 
 	}
@@ -586,12 +588,78 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 		return gui;
 	}
 
+	/** Wechsel des Diagramm-Tabs beendet die Simulation (analog iOS-Moduswechsel). */
+	public void onStruktogrammTabChanged() {
+		if (simulationMode) {
+			endSimulationInternal();
+		}
+	}
+
+	/** Beendet die Simulation (Menü, Tab-Wechsel, Panel-Button „Zurück“). */
+	public void leaveSimulationMode() {
+		if (simulationMode) {
+			endSimulationInternal();
+		}
+	}
+
+	public boolean isSimulationMode() {
+		return simulationMode;
+	}
+
+	/** Gleiche Aktion wie Bearbeiten → Simulation… / Diagramm bearbeiten… (Paletten-Button). */
+	public void toggleSimulationFromUi() {
+		onSimulationToggle();
+	}
+
+	private void onSimulationToggle() {
+		if (simulationMode) {
+			endSimulationInternal();
+		} else {
+			enterSimulation();
+		}
+	}
+
+	private void enterSimulation() {
+		if (gui.gibTabbedpane().getTabCount() <= 0) {
+			return;
+		}
+		gui.gibElementEditorPanel().applyPendingTextToDiagram();
+		Struktogramm str = gibAktuellesStruktogramm();
+		if (str == null) {
+			return;
+		}
+		try {
+			SimulationDocument doc = str.toSimulationDocument();
+			SimulationEngine eng = new SimulationEngine(doc);
+			simulationMode = true;
+			gui.getSimulationPanel().setEngine(eng);
+			gui.showSimulationCard();
+			gui.setEditSimulationMenuText(I18n.tr("menu.edit.diagramMode"));
+			aktualisierePalettenBeschriftungen();
+		} catch (XmlDecodeException ex) {
+			JOptionPane.showMessageDialog(gui, ex.getMessage(), I18n.tr("simulation.error.title"), JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
+	private void endSimulationInternal() {
+		simulationMode = false;
+		gui.showEditorCard();
+		gui.getSimulationPanel().clearEngine();
+		gui.setEditSimulationMenuText(I18n.tr("menu.edit.simulation"));
+		Struktogramm str = gibAktuellesStruktogramm();
+		if (str != null) {
+			str.setzeSimulationSpotlightPfad(null);
+		}
+		aktualisierePalettenBeschriftungen();
+	}
+
 
 
 
 
 
 	public boolean programmBeendenGeklickt(){
+		leaveSimulationMode();
 		if(gui.gibTabbedpane().einOderMehrereStruktogrammeNichtGespeichert()){                  
 			Object[] options = { I18n.tr("dialog.exitUnsaved.quit"), I18n.tr("dialog.exitUnsaved.stay") };
 			int r = JOptionPane.showOptionDialog(gui, I18n.tr("dialog.exitUnsaved.message"),
