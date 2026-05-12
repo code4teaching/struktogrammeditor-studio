@@ -56,6 +56,7 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 	private static final long serialVersionUID = 3619714917985247680L;
 	private AuswahlPanelElement[] panelElemente = new AuswahlPanelElement[9]; //9 StruktogrammElemente stehen zur Auswahl
 	private JButton palettePngButton;
+	private JButton paletteCodeGenButton;
 	private JButton paletteInfoButton;
 	private DragSource dragSource;
 	private JButton muelleimer;
@@ -120,6 +121,14 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		muelleimerAuf(!muelleimerIstAuf);
 		muelleimerTooltipSetzen();
 		add(muelleimer, c);
+
+		c.gridy++;
+		paletteCodeGenButton = paletteAktionsButton(I18n.tr("palette.generateCode"));
+		paletteCodeGenButton.setToolTipText(I18n.tr("menu.file.generateCode"));
+		paletteCodeGenButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.generateCode"));
+		paletteCodeGenButton.addActionListener(e -> new CodeErzeuger(controlling.getGUI(),
+				I18n.tr("menu.file.generateCode"), true, controlling.gibAktuellesStruktogramm()));
+		add(paletteCodeGenButton, c);
 
 		c.gridy++;
 		c.insets = new Insets(1, 0, 3, 0);
@@ -205,6 +214,11 @@ public class AuswahlPanel extends JPanel implements DropTargetListener, DragGest
 		muelleimer.setForeground(paletteTrashBaseColor());
 		muelleimerTooltipSetzen();
 		muelleimerIconZumAktuellenZustand();
+		if (paletteCodeGenButton != null) {
+			paletteCodeGenButton.setText(I18n.tr("palette.generateCode"));
+			paletteCodeGenButton.setToolTipText(I18n.tr("menu.file.generateCode"));
+			paletteCodeGenButton.getAccessibleContext().setAccessibleName(I18n.tr("palette.generateCode"));
+		}
 		if (palettePngButton != null) {
 			palettePngButton.setText(I18n.tr("palette.exportPng"));
 		}

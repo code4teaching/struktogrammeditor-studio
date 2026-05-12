@@ -313,15 +313,29 @@ public class GlobalSettings implements Konstanten{
 			}
 		}
 
-		s = pr.getProperty("elementbeschriftungpreset");
-		if (s != null) {
+		/* Neu: elementlabelpreset = 0 (Java) | 1 (didaktisch/UI-Sprache). Legacy: elementbeschriftungpreset 0–4. */
+		s = pr.getProperty("elementlabelpreset");
+		if (s != null && !s.isBlank()) {
 			try {
 				int p = Integer.parseInt(s.trim());
-				if (p >= 0 && p < ElementBeschriftungPresets.ANZAHL_PRESETS) {
+				if (p == ElementBeschriftungPresets.PRESET_ENGLISH_JAVA
+						|| p == ElementBeschriftungPresets.PRESET_DIDACTIC_I18N) {
 					elementBeschriftungPresetIndex = p;
 				}
 			} catch (NumberFormatException ignored) {
 				// ungültig → Standard beibehalten
+			}
+		} else {
+			s = pr.getProperty("elementbeschriftungpreset");
+			if (s != null && !s.isBlank()) {
+				try {
+					int p = Integer.parseInt(s.trim());
+					if (p >= 0 && p <= 4) {
+						elementBeschriftungPresetIndex = ElementBeschriftungPresets.migrateLegacyPresetIndex(p);
+					}
+				} catch (NumberFormatException ignored) {
+					// ungültig → Standard beibehalten
+				}
 			}
 		}
 
@@ -378,7 +392,7 @@ public class GlobalSettings implements Konstanten{
 		
 		properties.setProperty("lookandfeel", ""+lookAndFeelAktuell);
 
-		properties.setProperty("elementbeschriftungpreset", "" + elementBeschriftungPresetIndex);
+		properties.setProperty("elementlabelpreset", "" + elementBeschriftungPresetIndex);
 
 		properties.setProperty("uilanguage", uiLanguageTag);
 

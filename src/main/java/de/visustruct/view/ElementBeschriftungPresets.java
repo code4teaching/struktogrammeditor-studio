@@ -7,48 +7,33 @@ import de.visustruct.i18n.StructureElementI18n;
 
 /**
  * Fest vorgegebene Textvorlagen für neu eingefügte Elemente (keine freie Eingabe).
+ * Zwei Pakete — wie VisuStruct-SwiftUI: syntaxnahe Java-Vorgaben oder Begriffe gemäß Oberflächensprache.
  * Muss dieselbe Länge haben wie {@link EinstellungsDialog#anzahlStruktogrammElemente}.
  */
 public final class ElementBeschriftungPresets {
 
-	public static final int PRESET_KLASSISCH = 0;
-	public static final int PRESET_FORMAL = 1;
-	public static final int PRESET_JAVA_NA = 2;
-	/** Syntaxnahe Java-Vorgaben — Programm-Standard; neue Blöcke mit Platzhaltertext, Palette mit {@link #javaStandardPaletteButtonLabel(int)}. */
-	public static final int PRESET_ENGLISH_JAVA = 3;
-	/** Didaktische Begriffe gemäß UI-Sprache ({@link StructureElementI18n}). */
-	public static final int PRESET_DIDACTIC_I18N = 4;
-	public static final int ANZAHL_PRESETS = 5;
+	/** Syntaxnahe Java-Vorgaben; Palette mit {@link #javaStandardPaletteButtonLabel(int)}. */
+	public static final int PRESET_ENGLISH_JAVA = 0;
+	/** Begriffe und Platzhalter gemäß gewählter Oberflächensprache ({@link StructureElementI18n}). */
+	public static final int PRESET_DIDACTIC_I18N = 1;
+	public static final int ANZAHL_PRESETS = 2;
 
-	/**
-	 * Reihenfolge im Dialog „Beschriftung (Struktogramm)“: zuerst Java (syntaxnah), danach
-	 * {@link #PRESET_DIDACTIC_I18N} — Standardtexte in der <b>gewählten Oberflächensprache</b> —, dann die
-	 * fest deutschsprachigen Pakete (Formal, Java-ähnlich, Klassisch).
-	 */
 	public static final int[] PRESET_DIALOG_REIHENFOLGE = {
 			PRESET_ENGLISH_JAVA,
 			PRESET_DIDACTIC_I18N,
-			PRESET_FORMAL,
-			PRESET_JAVA_NA,
-			PRESET_KLASSISCH,
 	};
 
 	private static final int N = 10;
 
-	private static final String[][] PRESETS = {
-			{"Anweisung", "Verzweigung", "Fallauswahl", "0 < i < anzahl", "While Schleife", "Do-While Schleife",
-					"Endlosschleife", "Aussprung", "Aufruf", "\u00f8"},
-			{"Anweisung", "Verzweigung", "Fallauswahl", "Z\u00e4hlergesteuerte Schleife", "Kopfgesteuerte Schleife",
-					"Fu\u00dfgesteuerte Schleife", "Endlosschleife", "Aussprung", "Aufruf", "Leeres Element"},
-			{"Anweisung", "if (Verzweigung)", "switch (Auswahl)", "For Schleife", "While Schleife", "Do-While Schleife",
-					"Endlosschleife", "Aussprung", "Aufruf", "Leeres Element"},
-			{"Statement", "condition", "selector", "i = 0; i < n; i++",
-					"condition", "condition", "\u221e", "break", "method()", "\u00f8"},
+	/** Standardtexte für {@link #PRESET_ENGLISH_JAVA} (Platzhalter in neuen Blöcken). */
+	private static final String[] ENGLISH_JAVA_ROW = {
+			"Statement", "condition", "selector", "i = 0; i < n; i++",
+			"condition", "condition", "\u221e", "break", "method()", "\u00f8",
 	};
 
 	/**
-	 * Nur Palette bei {@link #PRESET_ENGLISH_JAVA}: echte Java-Schlüsselwörter / übliche Kurzformen (nicht {@code condition} für alles).
-	 * Reihenfolge = Elementtypen 0–9 wie {@link #PRESETS}.
+	 * Nur Palette bei {@link #PRESET_ENGLISH_JAVA}: echte Java-Schlüsselwörter / übliche Kurzformen
+	 * (nicht {@code condition} für alles).
 	 */
 	private static final String[] JAVA_STANDARD_PALETTE_LABELS = {
 			"Statement",
@@ -64,23 +49,30 @@ public final class ElementBeschriftungPresets {
 	};
 
 	static {
-		if (PRESETS.length != ANZAHL_PRESETS - 1) {
-			throw new IllegalStateException("Preset-Anzahl");
-		}
 		if (PRESET_DIALOG_REIHENFOLGE.length != ANZAHL_PRESETS) {
 			throw new IllegalStateException("Preset-Dialog-Reihenfolge");
 		}
 		if (JAVA_STANDARD_PALETTE_LABELS.length != N) {
 			throw new IllegalStateException("Java-Palette-L\u00e4nge");
 		}
-		for (String[] row : PRESETS) {
-			if (row.length != N) {
-				throw new IllegalStateException("Preset-L\u00e4nge");
-			}
+		if (ENGLISH_JAVA_ROW.length != N) {
+			throw new IllegalStateException("English-Java-Preset-L\u00e4nge");
 		}
 	}
 
 	private ElementBeschriftungPresets() {
+	}
+
+	/**
+	 * Alte Einstellungen (0–4) aus {@code elementbeschriftungpreset} auf die zwei verbleibenden
+	 * Presets abbilden.
+	 */
+	public static int migrateLegacyPresetIndex(int legacy) {
+		return switch (legacy) {
+			case 0, 1, 4 -> PRESET_DIDACTIC_I18N;
+			case 2, 3 -> PRESET_ENGLISH_JAVA;
+			default -> PRESET_ENGLISH_JAVA;
+		};
 	}
 
 	/** Gespeichertes Preset → Index der zugehörigen Radio-Option im Dialog. */
@@ -110,20 +102,11 @@ public final class ElementBeschriftungPresets {
 	}
 
 	public static String getPresetAnzeigename(int index) {
-		switch (index) {
-		case PRESET_KLASSISCH:
-			return I18n.tr("elementPreset.classic");
-		case PRESET_FORMAL:
-			return I18n.tr("elementPreset.formal");
-		case PRESET_JAVA_NA:
-			return I18n.tr("elementPreset.javaLikeDe");
-		case PRESET_ENGLISH_JAVA:
-			return I18n.tr("elementPreset.englishJava");
-		case PRESET_DIDACTIC_I18N:
-			return I18n.tr("menu.settings.labelsStruktogramm");
-		default:
-			return I18n.tr("elementPreset.englishJava");
-		}
+		return switch (index) {
+			case PRESET_ENGLISH_JAVA -> I18n.tr("elementPreset.englishJava");
+			case PRESET_DIDACTIC_I18N -> I18n.tr("elementPreset.didacticUiLanguage");
+			default -> I18n.tr("elementPreset.englishJava");
+		};
 	}
 
 	public static String[] gibPresetZeile(int index) {
@@ -131,9 +114,9 @@ public final class ElementBeschriftungPresets {
 			return StructureElementI18n.didacticDefaultTexts();
 		}
 		if (index < 0 || index >= ANZAHL_PRESETS) {
-			return PRESETS[PRESET_ENGLISH_JAVA];
+			return Arrays.copyOf(ENGLISH_JAVA_ROW, N);
 		}
-		return PRESETS[index];
+		return Arrays.copyOf(ENGLISH_JAVA_ROW, N);
 	}
 
 	public static String[] kopierePreset(int index) {

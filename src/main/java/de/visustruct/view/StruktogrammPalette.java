@@ -21,7 +21,7 @@ public final class StruktogrammPalette {
 		case 0:
 			return "Statement";
 		case 1:
-			return "Branch";
+			return "If";
 		case 2:
 			return "Switch";
 		case 3:
@@ -47,7 +47,7 @@ public final class StruktogrammPalette {
 		case 0:
 			return "Statement — simple action or assignment";
 		case 1:
-			return "If — conditional branch";
+			return "If / else — decision";
 		case 2:
 			return "Switch — multi-way selection";
 		case 3:
