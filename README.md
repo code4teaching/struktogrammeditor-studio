@@ -24,8 +24,9 @@ git clone https://github.com/code4teaching/VisuStruct.git
 
 ## Changes in 1.2.1 (summary)
 
-- **Simulation:** correct **true/false** branch selection after swapped branches; **reset (Stop)** rebuilds the step list and accepts a **new input** on rerun.
-- **Save:** pending **element-editor** text is applied before save; more reliable save dialog on **macOS**.
+- **Simulation:** **true/false** branch selection by case name; **reset (Stop)** for new input on rerun; highlight mode and play speed in Settings; sidebar layout (input always visible, current block shows instruction text).
+- **Save:** pending **element-editor** text applied before save; more reliable save dialog on **macOS**.
+- **Code generator:** structure chart text as comments **off** by default.
 
 Full notes: [`release-notes/v1.2.1.md`](release-notes/v1.2.1.md).
 
