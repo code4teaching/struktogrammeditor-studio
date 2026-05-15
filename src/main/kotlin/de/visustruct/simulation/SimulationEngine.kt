@@ -454,6 +454,14 @@ constructor(document: SimulationDocument) {
     fun getInputErrorForUi(): String? = state.inputError
     fun getStepIndexForUi(): Int = state.stepIndex
 
+    /** Text des Simulationsschritts zum Diagramm-Pfad (für die Anzeige „Aktueller Block“). */
+    fun findStepTextByPath(path: List<Int>?): String? {
+        if (path == null || path.isEmpty()) {
+            return null
+        }
+        return stepsMutable.firstOrNull { it.path == path }?.text
+    }
+
     companion object {
         const val ENGINE_VERSION: String = "simulation-1"
     }

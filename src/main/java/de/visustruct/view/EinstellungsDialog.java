@@ -36,6 +36,8 @@ public class EinstellungsDialog extends JDialog {
 
 	private final GUI hostGui;
 	private final JComboBox<Double> simulationSpeedCombo;
+	private final JRadioButton simulationHighlightLastRadio = new JRadioButton();
+	private final JRadioButton simulationHighlightNextRadio = new JRadioButton();
 
 	public EinstellungsDialog(GUI gui, boolean modal) {
 		super(gui, I18n.tr("dialog.elementText.title"), modal);
@@ -57,10 +59,35 @@ public class EinstellungsDialog extends JDialog {
 		simulationSpeedCombo.setRenderer(new SimulationSpeedListRenderer());
 		simulationSpeedCombo.setSelectedIndex(GlobalSettings.getSimulationPlayDelayIndex());
 
-		JPanel simulationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+		JPanel simulationPanel = new JPanel();
+		simulationPanel.setLayout(new BoxLayout(simulationPanel, BoxLayout.Y_AXIS));
 		simulationPanel.setBorder(BorderFactory.createTitledBorder(I18n.tr("dialog.elementText.simulationSection")));
-		simulationPanel.add(new JLabel(I18n.tr("dialog.elementText.simulationSpeedLabel")));
-		simulationPanel.add(simulationSpeedCombo);
+
+		JPanel speedRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+		speedRow.add(new JLabel(I18n.tr("dialog.elementText.simulationSpeedLabel")));
+		speedRow.add(simulationSpeedCombo);
+		simulationPanel.add(speedRow);
+
+		JPanel highlightBlock = new JPanel();
+		highlightBlock.setLayout(new BoxLayout(highlightBlock, BoxLayout.Y_AXIS));
+		highlightBlock.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+		highlightBlock.add(new JLabel(I18n.tr("dialog.elementText.simulationHighlightLabel")));
+		ButtonGroup highlightGroup = new ButtonGroup();
+		highlightGroup.add(simulationHighlightLastRadio);
+		highlightGroup.add(simulationHighlightNextRadio);
+		simulationHighlightLastRadio.setText(I18n.tr("dialog.elementText.simulationHighlightLast"));
+		simulationHighlightNextRadio.setText(I18n.tr("dialog.elementText.simulationHighlightNext"));
+		if (GlobalSettings.isSimulationHighlightNextStep()) {
+			simulationHighlightNextRadio.setSelected(true);
+		} else {
+			simulationHighlightLastRadio.setSelected(true);
+		}
+		JPanel highlightRadios = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+		highlightRadios.add(simulationHighlightLastRadio);
+		highlightRadios.add(simulationHighlightNextRadio);
+		highlightBlock.add(highlightRadios);
+		simulationPanel.add(Box.createVerticalStrut(6));
+		simulationPanel.add(highlightBlock);
 
 		int startIdx = GlobalSettings.getElementBeschriftungPresetIndex();
 		if (startIdx < 0 || startIdx >= ElementBeschriftungPresets.ANZAHL_PRESETS) {
@@ -135,6 +162,10 @@ public class EinstellungsDialog extends JDialog {
 		if (speed != null) {
 			GlobalSettings.setSimulationPlayDelaySec(speed);
 		}
+		GlobalSettings.setSimulationHighlightMode(
+			simulationHighlightNextRadio.isSelected()
+				? GlobalSettings.SimulationHighlightMode.NEXT_STEP
+				: GlobalSettings.SimulationHighlightMode.LAST_EXECUTED);
 		int sel = ElementBeschriftungPresets.PRESET_ENGLISH_JAVA;
 		for (int u = 0; u < radios.length; u++) {
 			if (radios[u].isSelected()) {
@@ -149,6 +180,7 @@ public class EinstellungsDialog extends JDialog {
 			hostGui.gibAuswahlPanel().aktualisiereBeschriftungen();
 			hostGui.gibAuswahlPanel().revalidate();
 			hostGui.gibAuswahlPanel().repaint();
+			hostGui.getSimulationPanel().onSimulationSettingsChanged();
 			SwingUtilities.invokeLater(() -> hostGui.gibAuswahlPanel().aktualisiereBeschriftungen());
 		});
 		setVisible(false);

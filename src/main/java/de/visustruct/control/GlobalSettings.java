@@ -111,7 +111,7 @@ public class GlobalSettings implements Konstanten{
 	private static int codeErzeugerEinrueckungProStufe = 3;
 	/** {@link CodeErzeuger#typJava}, {@link CodeErzeuger#typPython} oder {@link CodeErzeuger#typJavaScript}. */
 	private static int codeErzeugerProgrammiersprache = CodeErzeuger.typJava;
-	private static boolean codeErzeugerAlsKommentar = true;
+	private static boolean codeErzeugerAlsKommentar = false;
 	
 	private static boolean elementShortcutsVerwenden = true;
 	
@@ -127,6 +127,16 @@ public class GlobalSettings implements Konstanten{
 	private static final double DEFAULT_SIMULATION_PLAY_DELAY_SEC = 0.5;
 
 	private static double simulationPlayDelaySec = DEFAULT_SIMULATION_PLAY_DELAY_SEC;
+
+	/** Welcher Block im Diagramm während der Simulation hervorgehoben wird. */
+	public enum SimulationHighlightMode {
+		/** Zuletzt ausgeführter Schritt (Standard). */
+		LAST_EXECUTED,
+		/** Nächster auszuführender Schritt. */
+		NEXT_STEP,
+	}
+
+	private static SimulationHighlightMode simulationHighlightMode = SimulationHighlightMode.LAST_EXECUTED;
 
 	/**
 	 * Extended-Modifier-Maske für Menü-Kurzbefehle (Strg bzw. ⌘), z. B. für
@@ -361,6 +371,11 @@ public class GlobalSettings implements Konstanten{
 			}
 		}
 
+		s = pr.getProperty("simulationhighlight");
+		if (s != null && !s.isBlank()) {
+			setSimulationHighlightMode(parseSimulationHighlightMode(s.trim()));
+		}
+
 		recentDiagramPaths.clear();
 		for (int i = 0; i < MAX_RECENT_DIAGRAM_FILES; i++) {
 			s = pr.getProperty("recentdiagram" + i);
@@ -413,6 +428,7 @@ public class GlobalSettings implements Konstanten{
 		properties.setProperty("uilanguage", uiLanguageTag);
 
 		properties.setProperty("simulationplaydelay", Double.toString(simulationPlayDelaySec));
+		properties.setProperty("simulationhighlight", simulationHighlightMode == SimulationHighlightMode.NEXT_STEP ? "next" : "last");
 
 		for (int i = 0; i < MAX_RECENT_DIAGRAM_FILES; i++) {
 			if (i < recentDiagramPaths.size()) {
@@ -705,5 +721,27 @@ public class GlobalSettings implements Konstanten{
 			}
 		}
 		return 1;
+	}
+
+	public static SimulationHighlightMode getSimulationHighlightMode() {
+		return simulationHighlightMode;
+	}
+
+	public static boolean isSimulationHighlightNextStep() {
+		return simulationHighlightMode == SimulationHighlightMode.NEXT_STEP;
+	}
+
+	public static void setSimulationHighlightMode(SimulationHighlightMode mode) {
+		simulationHighlightMode =
+			mode == SimulationHighlightMode.NEXT_STEP
+				? SimulationHighlightMode.NEXT_STEP
+				: SimulationHighlightMode.LAST_EXECUTED;
+	}
+
+	private static SimulationHighlightMode parseSimulationHighlightMode(String raw) {
+		if ("next".equalsIgnoreCase(raw)) {
+			return SimulationHighlightMode.NEXT_STEP;
+		}
+		return SimulationHighlightMode.LAST_EXECUTED;
 	}
 }

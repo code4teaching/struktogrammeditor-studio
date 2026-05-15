@@ -5,17 +5,15 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Insets;
-import java.awt.event.ItemEvent;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
-import javax.swing.ButtonGroup;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -31,28 +29,27 @@ import de.visustruct.simulation.SimulationEngine;
 import de.visustruct.simulation.SimulationInputRequest;
 
 /**
- * Simulations-Ansicht: Transport (Play/Pause/Step/Stop), Highlight-Modus, Variablen, Ausgabe, Eingabe.
+ * Simulations-Ansicht: Steuerung, Eingabe, Variablen, aktueller Block, Ausgabe (von oben nach unten).
+ * Diagramm-Markierung: {@link GlobalSettings#getSimulationHighlightMode()}.
  */
 public class SimulationPanel extends JPanel {
 
 	private static final long serialVersionUID = 1L;
 
-	/** Mediensymbole (an SF Symbols / Swift-Steuerung angelehnt). */
 	private static final String SYM_PLAY = "\u25B6";
 	private static final String SYM_PAUSE = "\u23F8";
 	private static final String SYM_STEP = "\u2192";
 	private static final String SYM_STOP = "\u23F9";
-	private static final String SYM_BACK = "\u2190";
 	private static final String SYM_SUBMIT = "\u2713";
 
 	private final Controlling controlling;
 	private SimulationEngine engine;
 
-	private final JTextArea variablesArea = new JTextArea(8, 40);
-	private final JTextArea outputArea = new JTextArea(8, 40);
+	private final JTextArea variablesArea = new JTextArea(4, 40);
+	private final JTextArea currentBlockArea = new JTextArea(3, 40);
+	private final JTextArea outputArea = new JTextArea(6, 40);
 	private final JLabel messageLabel = new JLabel(" ");
 	private final JLabel traceLabel = new JLabel(" ");
-	private final JLabel pathLabel = new JLabel(" ");
 	private final JLabel inputPromptLabel = new JLabel(" ");
 	private final JTextField inputField = new JTextField(24);
 	private final JButton inputSubmitButton = new JButton();
@@ -60,20 +57,17 @@ public class SimulationPanel extends JPanel {
 	private final JButton pauseButton = new JButton();
 	private final JButton stepButton = new JButton();
 	private final JButton stopButton = new JButton();
-	private final JButton backButton = new JButton();
-
-	private final JLabel highlightLabel = new JLabel();
-	private final JRadioButton highlightNextRadio = new JRadioButton();
-	private final JRadioButton highlightLastRadio = new JRadioButton();
 
 	private final Timer playTimer;
 	private boolean playing;
-	/** Wiedergabe nach erfolgreicher Eingabe fortsetzen (war vor input: aktiv). */
 	private boolean resumePlayAfterInput;
+
 	private JPanel controlsNorthPanel;
 	private JPanel inputSectionPanel;
+	private JPanel currentBlockPanel;
+	private JScrollPane variablesScroll;
+	private JScrollPane outputScroll;
 
-	/** Pfad des zuletzt ausgeführten Schritts (für „Letzter Schritt“). */
 	private List<Integer> lastExecutedSimulationPath;
 
 	public SimulationPanel(Controlling controlling) {
@@ -83,9 +77,17 @@ public class SimulationPanel extends JPanel {
 
 		Font mono = Font.decode(Font.MONOSPACED + "-PLAIN-13");
 		variablesArea.setFont(mono);
+		currentBlockArea.setFont(mono);
 		outputArea.setFont(mono);
 		variablesArea.setEditable(false);
+		currentBlockArea.setEditable(false);
 		outputArea.setEditable(false);
+		currentBlockArea.setLineWrap(true);
+		currentBlockArea.setWrapStyleWord(true);
+
+		Font statusFont = mono.deriveFont(Font.ITALIC, 12f);
+		messageLabel.setFont(statusFont);
+		traceLabel.setFont(statusFont);
 
 		playTimer = new Timer(GlobalSettings.getSimulationPlayDelayMs(), e -> onPlayTick());
 		playTimer.setRepeats(true);
@@ -94,37 +96,19 @@ public class SimulationPanel extends JPanel {
 		pauseButton.addActionListener(e -> onPause());
 		stepButton.addActionListener(e -> onStep());
 		stopButton.addActionListener(e -> onStop());
-		backButton.addActionListener(e -> controlling.leaveSimulationMode());
+		inputSubmitButton.addActionListener(e -> onSubmitInput());
+		inputField.addActionListener(e -> onSubmitInput());
 
 		JPanel transport = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
 		transport.add(playButton);
 		transport.add(pauseButton);
 		transport.add(stepButton);
 		transport.add(stopButton);
-		transport.add(Box.createHorizontalStrut(12));
-		transport.add(backButton);
 
-		ButtonGroup highlightGroup = new ButtonGroup();
-		highlightGroup.add(highlightNextRadio);
-		highlightGroup.add(highlightLastRadio);
-		highlightLastRadio.setSelected(true);
-		var highlightListener = (java.awt.event.ItemListener) e -> {
-			if (e.getStateChange() == ItemEvent.SELECTED) {
-				applyDiagramHighlight();
-			}
-		};
-		highlightNextRadio.addItemListener(highlightListener);
-		highlightLastRadio.addItemListener(highlightListener);
-
-		JPanel highlightRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-		highlightRow.add(highlightLabel);
-		highlightRow.add(highlightNextRadio);
-		highlightRow.add(highlightLastRadio);
-
-		controlsNorthPanel = new JPanel(new BorderLayout(0, 6));
+		controlsNorthPanel = new JPanel(new BorderLayout(0, 4));
 		controlsNorthPanel.setBorder(BorderFactory.createTitledBorder(I18n.tr("simulation.controls")));
 		controlsNorthPanel.add(transport, BorderLayout.NORTH);
-		controlsNorthPanel.add(highlightRow, BorderLayout.SOUTH);
+		controlsNorthPanel.add(messageLabel, BorderLayout.SOUTH);
 
 		inputSectionPanel = new JPanel(new BorderLayout(0, 6));
 		inputSectionPanel.setBorder(BorderFactory.createTitledBorder(I18n.tr("simulation.input")));
@@ -133,37 +117,36 @@ public class SimulationPanel extends JPanel {
 		inputRow.add(inputField, BorderLayout.CENTER);
 		inputRow.add(inputSubmitButton, BorderLayout.EAST);
 		inputSectionPanel.add(inputRow, BorderLayout.CENTER);
+		inputSectionPanel.setPreferredSize(new Dimension(260, 72));
 
-		JPanel northStack = new JPanel(new BorderLayout(0, 10));
-		northStack.add(inputSectionPanel, BorderLayout.NORTH);
-		northStack.add(controlsNorthPanel, BorderLayout.CENTER);
-		add(northStack, BorderLayout.NORTH);
+		variablesScroll = new JScrollPane(variablesArea);
+		variablesScroll.setBorder(BorderFactory.createTitledBorder(I18n.tr("simulation.variables")));
+		variablesScroll.setPreferredSize(new Dimension(260, 88));
+
+		currentBlockPanel = new JPanel(new BorderLayout(0, 4));
+		currentBlockPanel.setBorder(BorderFactory.createTitledBorder(I18n.tr("simulation.path")));
+		currentBlockPanel.add(new JScrollPane(currentBlockArea), BorderLayout.CENTER);
+		currentBlockPanel.add(traceLabel, BorderLayout.SOUTH);
+		currentBlockPanel.setPreferredSize(new Dimension(260, 96));
+
+		outputScroll = new JScrollPane(outputArea);
+		outputScroll.setBorder(BorderFactory.createTitledBorder(I18n.tr("simulation.output")));
+
+		JPanel topStack = new JPanel();
+		topStack.setLayout(new BoxLayout(topStack, BoxLayout.Y_AXIS));
+		topStack.add(controlsNorthPanel);
+		topStack.add(Box.createVerticalStrut(8));
+		topStack.add(inputSectionPanel);
+		topStack.add(Box.createVerticalStrut(8));
+		topStack.add(variablesScroll);
+		topStack.add(Box.createVerticalStrut(8));
+		topStack.add(currentBlockPanel);
+
+		add(topStack, BorderLayout.NORTH);
+		add(outputScroll, BorderLayout.CENTER);
 
 		applyTransportLabelsAndTips();
-		applyHighlightLabels();
-
-		JScrollPane varScroll = new JScrollPane(variablesArea);
-		varScroll.setBorder(BorderFactory.createTitledBorder(I18n.tr("simulation.variables")));
-		JScrollPane outScroll = new JScrollPane(outputArea);
-		outScroll.setBorder(BorderFactory.createTitledBorder(I18n.tr("simulation.output")));
-		javax.swing.JSplitPane split = new javax.swing.JSplitPane(javax.swing.JSplitPane.VERTICAL_SPLIT, varScroll, outScroll);
-		split.setResizeWeight(0.45);
-		split.setDividerLocation(200);
-		split.setContinuousLayout(true);
-		add(split, BorderLayout.CENTER);
-
-		inputSubmitButton.addActionListener(e -> onSubmitInput());
-		inputField.addActionListener(e -> onSubmitInput());
-
-		JPanel south = new JPanel(new BorderLayout(4, 6));
-		JPanel labels = new JPanel(new BorderLayout(2, 4));
-		labels.add(messageLabel, BorderLayout.NORTH);
-		labels.add(traceLabel, BorderLayout.CENTER);
-		labels.add(pathLabel, BorderLayout.SOUTH);
-		south.add(labels, BorderLayout.CENTER);
-		add(south, BorderLayout.SOUTH);
-
-		setMinimumSize(new Dimension(260, 200));
+		setMinimumSize(new Dimension(260, 320));
 		clearEngine();
 	}
 
@@ -174,10 +157,6 @@ public class SimulationPanel extends JPanel {
 		return new ArrayList<>(path);
 	}
 
-	/**
-	 * Nach Verzweigung/Schleife: Engine ersetzt einen Kopf-Schritt durch Unter-Schritte —
-	 * der Pfad wird länger (z. B. [1] → [1,0,0]). Dann ersten Schritt im Zweig markieren.
-	 */
 	private static boolean isStrictPathExtension(List<Integer> before, List<Integer> after) {
 		if (before == null || after == null || after.size() <= before.size()) {
 			return false;
@@ -229,12 +208,6 @@ public class SimulationPanel extends JPanel {
 		stopButton.setToolTipText(I18n.tr("simulation.stop.tooltip"));
 		stopButton.getAccessibleContext().setAccessibleName(I18n.tr("simulation.stop"));
 
-		backButton.setFont(symFont);
-		backButton.setText(SYM_BACK);
-		backButton.setMargin(new Insets(4, 10, 4, 10));
-		backButton.setToolTipText(I18n.tr("simulation.back.tooltip"));
-		backButton.getAccessibleContext().setAccessibleName(I18n.tr("simulation.back"));
-
 		inputSubmitButton.setFont(symFont);
 		inputSubmitButton.setText(SYM_SUBMIT);
 		inputSubmitButton.setMargin(new Insets(4, 10, 4, 10));
@@ -250,12 +223,13 @@ public class SimulationPanel extends JPanel {
 		return base.deriveFont(Font.PLAIN, Math.max(15f, base.getSize2D() + 3f));
 	}
 
-	private void applyHighlightLabels() {
-		highlightLabel.setText(I18n.tr("simulation.highlight"));
-		highlightNextRadio.setText(I18n.tr("simulation.highlight.nextStep"));
-		highlightLastRadio.setText(I18n.tr("simulation.highlight.lastStep"));
-		highlightNextRadio.getAccessibleContext().setAccessibleName(I18n.tr("simulation.highlight.nextStep"));
-		highlightLastRadio.getAccessibleContext().setAccessibleName(I18n.tr("simulation.highlight.lastStep"));
+	public void onSimulationSettingsChanged() {
+		if (playTimer != null) {
+			playTimer.setDelay(GlobalSettings.getSimulationPlayDelayMs());
+		}
+		if (engine != null) {
+			refreshFromEngine();
+		}
 	}
 
 	private void clearDiagramSimulationHighlight() {
@@ -274,11 +248,9 @@ public class SimulationPanel extends JPanel {
 			str.setzeSimulationSpotlightPfad(null);
 			return;
 		}
-		List<Integer> p = resolveHighlightPath();
-		str.setzeSimulationSpotlightPfad(p);
+		str.setzeSimulationSpotlightPfad(resolveHighlightPath());
 	}
 
-	/** Pfad für die Diagramm-Markierung (je nach Radio „nächster“ / „letzter“ Schritt). */
 	private List<Integer> resolveHighlightPath() {
 		if (engine == null) {
 			return null;
@@ -286,7 +258,7 @@ public class SimulationPanel extends JPanel {
 		List<Integer> current = copyPath(engine.getCurrentStepPath());
 		boolean simAmEnde = engine.getInputRequestForUi() == null && !engine.getCanStep();
 
-		if (highlightNextRadio.isSelected()) {
+		if (GlobalSettings.isSimulationHighlightNextStep()) {
 			if (current != null && !current.isEmpty()) {
 				return current;
 			}
@@ -304,6 +276,41 @@ public class SimulationPanel extends JPanel {
 			return current;
 		}
 		return null;
+	}
+
+	private String resolveCurrentBlockDisplayText() {
+		if (engine == null) {
+			return "";
+		}
+		List<Integer> highlightPath = resolveHighlightPath();
+		String stepText = engine.findStepTextByPath(highlightPath);
+		if (stepText != null && !stepText.isBlank()) {
+			return stepText.trim();
+		}
+		if (!engine.getCanStep()) {
+			String msg = engine.getUiMessage();
+			if (msg != null && !msg.isBlank()) {
+				return msg.trim();
+			}
+			return "—";
+		}
+		return "—";
+	}
+
+	private void updateStatusAndBlockPanels() {
+		String msg = engine != null ? engine.getUiMessage() : null;
+		boolean showStatus =
+			msg != null && !msg.isBlank()
+				&& (engine.getInputRequestForUi() == null || engine.getInputErrorForUi() == null);
+		messageLabel.setText(showStatus ? msg.trim() : " ");
+		messageLabel.setVisible(showStatus);
+
+		currentBlockArea.setText(resolveCurrentBlockDisplayText());
+
+		String tr = engine != null ? engine.getUiLastTrace() : null;
+		boolean showTrace = tr != null && !tr.isBlank();
+		traceLabel.setText(showTrace ? tr.trim() : " ");
+		traceLabel.setVisible(showTrace);
 	}
 
 	@Override
@@ -330,15 +337,23 @@ public class SimulationPanel extends JPanel {
 		lastExecutedSimulationPath = null;
 		clearDiagramSimulationHighlight();
 		variablesArea.setText("");
+		currentBlockArea.setText("");
 		outputArea.setText("");
 		messageLabel.setText(" ");
+		messageLabel.setVisible(false);
 		traceLabel.setText(" ");
-		pathLabel.setText(" ");
+		traceLabel.setVisible(false);
 		inputPromptLabel.setText(" ");
+		inputField.setText("");
+		setInputSectionIdle();
+		updateTransportButtons();
+	}
+
+	private void setInputSectionIdle() {
+		inputPromptLabel.setText(I18n.tr("simulation.input.idle"));
 		inputField.setText("");
 		inputField.setEnabled(false);
 		inputSubmitButton.setEnabled(false);
-		updateTransportButtons();
 	}
 
 	public void refreshFromEngine() {
@@ -346,6 +361,7 @@ public class SimulationPanel extends JPanel {
 			clearEngine();
 			return;
 		}
+
 		StringBuilder vars = new StringBuilder();
 		for (var e : new java.util.TreeMap<>(engine.getVariablesSnapshot()).entrySet()) {
 			vars.append(e.getKey()).append(" = ").append(e.getValue()).append('\n');
@@ -362,24 +378,7 @@ public class SimulationPanel extends JPanel {
 			outputArea.setCaretPosition(outText.length());
 		}
 
-		String msg = engine.getUiMessage();
-		messageLabel.setText(msg != null && !msg.isEmpty() ? msg : " ");
-		String tr = engine.getUiLastTrace();
-		traceLabel.setText(tr != null && !tr.isEmpty() ? tr : " ");
-
-		List<Integer> path = engine.getCurrentStepPath();
-		if (path == null || path.isEmpty()) {
-			pathLabel.setText(I18n.tr("simulation.path") + ": —");
-		} else {
-			StringBuilder pb = new StringBuilder();
-			for (int i = 0; i < path.size(); i++) {
-				if (i > 0) {
-					pb.append(" / ");
-				}
-				pb.append(path.get(i));
-			}
-			pathLabel.setText(I18n.tr("simulation.path") + ": " + pb);
-		}
+		updateStatusAndBlockPanels();
 
 		SimulationInputRequest req = engine.getInputRequestForUi();
 		String err = engine.getInputErrorForUi();
@@ -393,12 +392,11 @@ public class SimulationPanel extends JPanel {
 			inputSubmitButton.setEnabled(true);
 			if (err != null && !err.isEmpty()) {
 				messageLabel.setText(err);
+				messageLabel.setVisible(true);
 			}
 			SwingUtilities.invokeLater(() -> inputField.requestFocusInWindow());
 		} else {
-			inputPromptLabel.setText(" ");
-			inputField.setEnabled(false);
-			inputSubmitButton.setEnabled(false);
+			setInputSectionIdle();
 		}
 
 		updateTransportButtons();
@@ -417,7 +415,6 @@ public class SimulationPanel extends JPanel {
 		pauseButton.setEnabled(hasEngine && playing);
 		stepButton.setEnabled(hasEngine && canStep);
 		stopButton.setEnabled(hasEngine);
-		backButton.setEnabled(true);
 	}
 
 	private void onPlay() {
@@ -503,22 +500,29 @@ public class SimulationPanel extends JPanel {
 		}
 	}
 
-	/** Menü-Sprache wechseln: Texte neu setzen. */
 	public void refreshLocalizedTexts() {
 		applyTransportLabelsAndTips();
-		applyHighlightLabels();
-		javax.swing.border.Border inB = inputSectionPanel.getBorder();
-		if (inB instanceof javax.swing.border.TitledBorder) {
-			((javax.swing.border.TitledBorder) inB).setTitle(I18n.tr("simulation.input"));
-		}
-		javax.swing.border.Border b = controlsNorthPanel.getBorder();
-		if (b instanceof javax.swing.border.TitledBorder) {
-			((javax.swing.border.TitledBorder) b).setTitle(I18n.tr("simulation.controls"));
-		}
+		setTitledBorderTitle(controlsNorthPanel, I18n.tr("simulation.controls"));
+		setTitledBorderTitle(inputSectionPanel, I18n.tr("simulation.input"));
+		setTitledBorderTitle(variablesScroll, I18n.tr("simulation.variables"));
+		setTitledBorderTitle(currentBlockPanel, I18n.tr("simulation.path"));
+		setTitledBorderTitle(outputScroll, I18n.tr("simulation.output"));
 		if (engine != null) {
 			refreshFromEngine();
 		} else {
 			clearEngine();
+		}
+	}
+
+	private static void setTitledBorderTitle(JPanel panel, String title) {
+		if (panel.getBorder() instanceof javax.swing.border.TitledBorder tb) {
+			tb.setTitle(title);
+		}
+	}
+
+	private static void setTitledBorderTitle(JScrollPane scroll, String title) {
+		if (scroll.getBorder() instanceof javax.swing.border.TitledBorder tb) {
+			tb.setTitle(title);
 		}
 	}
 }
