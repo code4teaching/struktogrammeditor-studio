@@ -10,7 +10,7 @@
 
 **VisuStruct** is a **structure-chart editor** for **Nassi–Shneiderman** diagrams (desktop, Java / Swing).
 
-Under **Settings → Languages** the **user interface** can be set to **English**, **German**, or **European Portuguese (Portugal)** (`uilanguage`: `en`, `de`, `pt_PT` in `visustruct.properties`). A few auxiliary dialogs may still show English-only labels.
+Under **Settings → Languages** the **user interface** can be set to any of **21 languages** aligned with **VisuStruct-swift** (English, German, Spanish, French, Italian, Polish, Turkish, Korean, Japanese, Greek, Ukrainian, Arabic, Russian, Hebrew, Dutch, Swedish, Danish, Norwegian Bokmål, Chinese Simplified/Traditional, European Portuguese). Stored as `uilanguage` in `visustruct.properties` (e.g. `zh_Hans`, `pt_PT`). UI strings are synced from the Swift app where keys overlap: `python3 tools/sync_java_messages_from_swift.py` (map: `VisuStruct-swift/tools/java_swift_i18n_map.json`). Desktop-only labels may still fall back to English.
 
 *Lineage:* Based on the open-source project [kekru/struktogrammeditor](https://github.com/kekru/struktogrammeditor) (Kevin Krummenauer, MIT). Copyright and terms: [LICENSE](LICENSE).
 
@@ -21,6 +21,13 @@ git clone https://github.com/code4teaching/VisuStruct.git
 ```
 
 ---
+
+## Changes in 1.2.2 (summary)
+
+- **Languages:** **21 UI languages** (VisuStruct-swift); `tools/sync_java_messages_from_swift.py`.
+- **CI:** GitHub Actions build passes again (headless-safe drag-and-drop init for tests).
+
+Full notes: [`release-notes/v1.2.2.md`](release-notes/v1.2.2.md).
 
 ## Changes in 1.2.1 (summary)
 
@@ -98,7 +105,7 @@ Full notes: [`release-notes/v1.0.7.md`](release-notes/v1.0.7.md).
 ## Changes in 1.0.6 (summary)
 
 - **UI & theme:** cleaner menus; **light / dark** FlatLaf **without restart**; improved dark-mode readability.
-- **Languages:** **Settings → Languages** lists **English**, **German**, **Portuguese**; stored in **`visustruct.properties`** (`uilanguage`). If unset, default follows **JVM locale**.
+- **Languages:** **Settings → Languages** lists **21 languages** (same set as VisuStruct-swift, except the Java-keyword pseudo-locale); stored in **`visustruct.properties`** (`uilanguage`). If unset, default follows **JVM locale**. Regenerate bundles: `python3 tools/sync_java_messages_from_swift.py`.
 - **I18n:** menu, core confirmation dialogs, `JFileChooser` labels, context menu, palette (PNG, about, trash, etc.); **English** is no longer overridden by the OS default locale.
 - **Structure-chart labels:** preset **“Java (default)”** (and localized equivalents); **preview** in the settings dialog; **palette** shows Java keywords on buttons when the Java preset is active.
 - **Tabs:** new diagram tab uses a localized **“Untitled”**-style title instead of a hard-coded English string.
@@ -141,7 +148,7 @@ This release aligns **branding and technical identity** with **VisuStruct**. **`
 - **Java 17** target (build and run with JDK 17+).
 - **FlatLaf** light/dark themes; **JDOM2**; no legacy AppleJavaExtensions.
 - **Motif** look-and-feel removed; **Metal** and FlatLaf available.
-- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.2.1.jar`**).
+- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.2.2.jar`**).
 
 ---
 
@@ -216,13 +223,13 @@ chmod +x mvnw
 Output (version from `pom.xml`):
 
 ```text
-target/visustruct-1.2.1.jar
+target/visustruct-1.2.2.jar
 ```
 
 ## Run
 
 ```bash
-java -jar target/visustruct-1.2.1.jar
+java -jar target/visustruct-1.2.2.jar
 ```
 
 Double-click may work if `.jar` is associated with Java.

@@ -14,7 +14,7 @@ import de.visustruct.control.GlobalSettings;
  * <p>
  * Ohne spezielles {@link ResourceBundle.Control} würde {@link ResourceBundle#getBundle(String, Locale)}
  * bei fehlendem sprachspezifischen Bundle auf die <b>System-Locale</b> zurückfallen und die falsche Sprache laden.
- * Unterstützt {@code en}, {@code de} und {@code pt_PT} ({@code Messages_pt_PT.properties}).
+	 * Unterstützt alle in {@link GlobalSettings#UI_LANGUAGE_OPTIONS} (21 Sprachen, wie VisuStruct-swift).
  */
 public final class I18n {
 

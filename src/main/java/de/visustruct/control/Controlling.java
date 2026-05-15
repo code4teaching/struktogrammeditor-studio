@@ -55,6 +55,7 @@ import de.visustruct.struktogrammelemente.StruktogrammElement;
 import de.visustruct.view.AuswahlPanel;
 import de.visustruct.view.CodeErzeuger;
 import de.visustruct.view.EinstellungsDialog;
+import de.visustruct.view.SimulationEinstellungenDialog;
 import de.visustruct.view.FontChooser;
 import de.visustruct.view.GUI;
 import de.visustruct.view.ZoomEinstellungen;
@@ -418,6 +419,10 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 			new EinstellungsDialog(gui, true);
 			break;
 
+		case simulationEinstellen:
+			new SimulationEinstellungenDialog(gui, true);
+			break;
+
 		case schriftartAendern:
 			new FontChooser(this,true);
 			break;
@@ -482,6 +487,11 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 
 	}
 
+
+	/** UI-Sprache wechseln (Menü oder Einstellungsdialog). */
+	public void applyUiLanguageChange(String tag) {
+		changeUiLanguageIfNeeded(tag);
+	}
 
 	private void changeUiLanguageIfNeeded(String tag) {
 		String next = GlobalSettings.normalizeUiLanguageTag(tag);

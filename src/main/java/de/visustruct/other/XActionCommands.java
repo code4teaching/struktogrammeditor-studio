@@ -13,6 +13,8 @@ public enum XActionCommands {
 
 	/** Dialog „Beschriftung (Struktogramm)“ / Textvorlagen für neue Blöcke. */
 	elementBeschriftungEinstellen,
+	/** Dialog Simulations-Einstellungen (Geschwindigkeit, Markierung). */
+	simulationEinstellen,
 	
 	info,
 	

@@ -4,9 +4,11 @@ import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
+import java.awt.event.ItemEvent;
 import java.awt.event.KeyEvent;
 import java.io.File;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.AbstractAction;
@@ -264,36 +266,21 @@ public class GUI extends JFrame implements Konstanten{
 			JMenu langMenu = createMenu(I18n.tr("menu.settings.languages"), KeyEvent.VK_I);
 			{
 				ButtonGroup langGroup = new ButtonGroup();
-				JRadioButtonMenuItem en = new JRadioButtonMenuItem(I18n.tr("menu.settings.language.en"));
-				en.addActionListener(controlling);
-				en.setActionCommand(XActionCommands.languageEnglish.toString());
-				langGroup.add(en);
-				langMenu.add(en);
-
-				JRadioButtonMenuItem de = new JRadioButtonMenuItem(I18n.tr("menu.settings.language.de"));
-				de.addActionListener(controlling);
-				de.setActionCommand(XActionCommands.languageGerman.toString());
-				langGroup.add(de);
-				langMenu.add(de);
-
-				JRadioButtonMenuItem pt = new JRadioButtonMenuItem(I18n.tr("menu.settings.language.pt"));
-				pt.addActionListener(controlling);
-				pt.setActionCommand(XActionCommands.languagePortuguesePortugal.toString());
-				langGroup.add(pt);
-				langMenu.add(pt);
-
-				// Erst nach Aufnahme in die ButtonGroup wählen (sonst kann die Auswahl je nach LAF inkonsistent sein)
-				if (GlobalSettings.isUiGerman()) {
-					de.setSelected(true);
-				} else if (GlobalSettings.isUiPortuguesePortugal()) {
-					pt.setSelected(true);
-				} else {
-					en.setSelected(true);
+				List<JRadioButtonMenuItem> langItems = new ArrayList<>();
+				for (GlobalSettings.UiLanguageOption opt : GlobalSettings.UI_LANGUAGE_OPTIONS) {
+					JRadioButtonMenuItem item = new JRadioButtonMenuItem(I18n.tr(opt.menuLabelKey()));
+					wireUiLanguageMenuItem(item, opt.tag());
+					langGroup.add(item);
+					langMenu.add(item);
+					langItems.add(item);
 				}
+				// Erst nach Aufnahme in die ButtonGroup wählen (sonst kann die Auswahl je nach LAF inkonsistent sein)
+				selectCurrentUiLanguageMenuItem(langItems);
 			}
 			menu.add(langMenu);
 
 			menu.add(createMenuItem(I18n.tr("menu.settings.labelsStruktogramm"), XActionCommands.elementBeschriftungEinstellen, KeyEvent.VK_B));
+			menu.add(createMenuItem(I18n.tr("menu.settings.simulation"), XActionCommands.simulationEinstellen, KeyEvent.VK_M));
 			menu.add(createMenuItem(I18n.tr("menu.settings.changeFont"), XActionCommands.schriftartAendern, KeyEvent.VK_F));
 			menu.add(new JSeparator());
 			menu.add(createMenuItem(I18n.tr("menu.settings.zoom"), XActionCommands.zoomeinstellungen, KeyEvent.VK_Z));
@@ -304,6 +291,28 @@ public class GUI extends JFrame implements Konstanten{
 		menubar.add(menu);
 	}
 
+
+	private static void selectCurrentUiLanguageMenuItem(List<JRadioButtonMenuItem> items) {
+		String tag = GlobalSettings.getUiLanguageTag();
+		for (int i = 0; i < items.size() && i < GlobalSettings.UI_LANGUAGE_OPTIONS.size(); i++) {
+			if (GlobalSettings.UI_LANGUAGE_OPTIONS.get(i).tag().equals(tag)) {
+				items.get(i).setSelected(true);
+				return;
+			}
+		}
+		if (!items.isEmpty()) {
+			items.get(0).setSelected(true);
+		}
+	}
+
+	/** macOS-Screen-Menü: {@link JRadioButtonMenuItem} löst oft kein {@link ActionEvent} aus — {@link ItemEvent#SELECTED} nutzen. */
+	private void wireUiLanguageMenuItem(JRadioButtonMenuItem item, String uiLanguageTag) {
+		item.addItemListener(e -> {
+			if (e.getStateChange() == ItemEvent.SELECTED) {
+				controlling.applyUiLanguageChange(uiLanguageTag);
+			}
+		});
+	}
 
 	private JMenu createMenu(String name, int auswahlBuchstabe){
 		JMenu neuMenu = new JMenu(name);

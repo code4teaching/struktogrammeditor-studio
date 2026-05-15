@@ -59,8 +59,34 @@ public class GlobalSettings implements Konstanten{
 	 */
 	private static int lookAndFeelAktuell = 4;
 
-	/** UI-Sprache: {@code en}, {@code de} oder {@code pt_PT} (Portugal; Menüleiste, I18n). */
+	/** UI-Sprache (Menüleiste, I18n); siehe {@link #UI_LANGUAGE_OPTIONS}. */
 	private static String uiLanguageTag = "en";
+
+	/** Tag und Menü-Label-Key für „Einstellungen → Sprachen“ (wie VisuStruct-swift). */
+	public record UiLanguageOption(String tag, String menuLabelKey) {}
+
+	public static final List<UiLanguageOption> UI_LANGUAGE_OPTIONS = List.of(
+			new UiLanguageOption("en", "menu.settings.language.en"),
+			new UiLanguageOption("de", "menu.settings.language.de"),
+			new UiLanguageOption("es", "menu.settings.language.es"),
+			new UiLanguageOption("fr", "menu.settings.language.fr"),
+			new UiLanguageOption("it", "menu.settings.language.it"),
+			new UiLanguageOption("pl", "menu.settings.language.pl"),
+			new UiLanguageOption("tr", "menu.settings.language.tr"),
+			new UiLanguageOption("ko", "menu.settings.language.ko"),
+			new UiLanguageOption("ja", "menu.settings.language.ja"),
+			new UiLanguageOption("el", "menu.settings.language.el"),
+			new UiLanguageOption("uk", "menu.settings.language.uk"),
+			new UiLanguageOption("ar", "menu.settings.language.ar"),
+			new UiLanguageOption("ru", "menu.settings.language.ru"),
+			new UiLanguageOption("he", "menu.settings.language.he"),
+			new UiLanguageOption("nl", "menu.settings.language.nl"),
+			new UiLanguageOption("sv", "menu.settings.language.sv"),
+			new UiLanguageOption("da", "menu.settings.language.da"),
+			new UiLanguageOption("nb", "menu.settings.language.nb"),
+			new UiLanguageOption("zh_Hans", "menu.settings.language.zh_Hans"),
+			new UiLanguageOption("zh_Hant", "menu.settings.language.zh_Hant"),
+			new UiLanguageOption("pt_PT", "menu.settings.language.pt"));
 
 	/** {@code true}, wenn {@code uilanguage} in der geladenen Properties-Datei stand (sonst JVM-Locale als Vorgabe). */
 	private static boolean uiLanguageFromPropertiesFile = false;
@@ -398,6 +424,79 @@ public class GlobalSettings implements Konstanten{
 			setUiLanguageTag("pt_PT");
 			return;
 		}
+		if ("es".equals(lang)) {
+			setUiLanguageTag("es");
+			return;
+		}
+		if ("fr".equals(lang)) {
+			setUiLanguageTag("fr");
+			return;
+		}
+		if ("it".equals(lang)) {
+			setUiLanguageTag("it");
+			return;
+		}
+		if ("nl".equals(lang)) {
+			setUiLanguageTag("nl");
+			return;
+		}
+		if ("pl".equals(lang)) {
+			setUiLanguageTag("pl");
+			return;
+		}
+		if ("tr".equals(lang)) {
+			setUiLanguageTag("tr");
+			return;
+		}
+		if ("ru".equals(lang)) {
+			setUiLanguageTag("ru");
+			return;
+		}
+		if ("ko".equals(lang)) {
+			setUiLanguageTag("ko");
+			return;
+		}
+		if ("ja".equals(lang)) {
+			setUiLanguageTag("ja");
+			return;
+		}
+		if ("el".equals(lang)) {
+			setUiLanguageTag("el");
+			return;
+		}
+		if ("uk".equals(lang)) {
+			setUiLanguageTag("uk");
+			return;
+		}
+		if ("ar".equals(lang)) {
+			setUiLanguageTag("ar");
+			return;
+		}
+		if ("he".equals(lang)) {
+			setUiLanguageTag("he");
+			return;
+		}
+		if ("sv".equals(lang)) {
+			setUiLanguageTag("sv");
+			return;
+		}
+		if ("da".equals(lang)) {
+			setUiLanguageTag("da");
+			return;
+		}
+		if ("nb".equals(lang)) {
+			setUiLanguageTag("nb");
+			return;
+		}
+		if ("zh".equals(lang)) {
+			String country = def.getCountry();
+			if ("TW".equalsIgnoreCase(country) || "HK".equalsIgnoreCase(country) || "MO".equalsIgnoreCase(country)) {
+				setUiLanguageTag("zh_Hant");
+			} else {
+				setUiLanguageTag("zh_Hans");
+			}
+			return;
+		}
 		setUiLanguageTag("en");
 	}
 	
@@ -650,33 +749,63 @@ public class GlobalSettings implements Konstanten{
 		GlobalSettings.lookAndFeelAktuell = themeIndex;
 	}
 
-	/** Locale für die UI-Texte: Englisch, Deutsch oder Português (Portugal, {@code pt-PT}). */
+	/** Locale für UI-Texte. */
 	public static Locale getUiLocale() {
-		if ("de".equals(uiLanguageTag)) {
-			return Locale.GERMAN;
-		}
-		if ("pt_PT".equals(uiLanguageTag)) {
-			return Locale.forLanguageTag("pt-PT");
-		}
-		return Locale.ENGLISH;
+		return switch (uiLanguageTag) {
+			case "de" -> Locale.GERMAN;
+			case "pt_PT" -> Locale.forLanguageTag("pt-PT");
+			case "es" -> Locale.forLanguageTag("es");
+			case "fr" -> Locale.FRENCH;
+			case "it" -> Locale.ITALIAN;
+			case "nl" -> Locale.forLanguageTag("nl");
+			case "pl" -> Locale.forLanguageTag("pl");
+			case "tr" -> Locale.forLanguageTag("tr");
+			case "ru" -> Locale.forLanguageTag("ru");
+			case "ko" -> Locale.KOREAN;
+			case "ja" -> Locale.JAPANESE;
+			case "el" -> Locale.forLanguageTag("el");
+			case "uk" -> Locale.forLanguageTag("uk");
+			case "ar" -> Locale.forLanguageTag("ar");
+			case "he" -> Locale.forLanguageTag("he");
+			case "sv" -> Locale.forLanguageTag("sv");
+			case "da" -> Locale.forLanguageTag("da");
+			case "nb" -> Locale.forLanguageTag("nb");
+			case "zh_Hans" -> Locale.forLanguageTag("zh-Hans");
+			case "zh_Hant" -> Locale.forLanguageTag("zh-Hant");
+			default -> Locale.ENGLISH;
+		};
 	}
 
 	public static String getUiLanguageTag() {
 		return uiLanguageTag;
 	}
 
-	/** Kanonische Tags: {@code en}, {@code de}, {@code pt_PT}. */
+	/** Kanonischer Tag aus {@link #UI_LANGUAGE_OPTIONS}; unbekannt → {@code en}. */
 	public static String normalizeUiLanguageTag(String tag) {
 		if (tag == null || tag.isBlank()) {
 			return "en";
 		}
 		String t = tag.trim();
-		if (t.equalsIgnoreCase("de")) {
-			return "de";
+		for (UiLanguageOption opt : UI_LANGUAGE_OPTIONS) {
+			if (opt.tag().equalsIgnoreCase(t)) {
+				return opt.tag();
+			}
 		}
 		String hy = t.replace('_', '-').toLowerCase(Locale.ROOT);
-		if ("pt-pt".equals(hy)) {
+		for (UiLanguageOption opt : UI_LANGUAGE_OPTIONS) {
+			String optHy = opt.tag().replace('_', '-').toLowerCase(Locale.ROOT);
+			if (hy.equals(optHy) || hy.startsWith(optHy + "-")) {
+				return opt.tag();
+			}
+		}
+		if ("pt".equalsIgnoreCase(t) || "pt-pt".equals(hy)) {
 			return "pt_PT";
+		}
+		if ("zh-cn".equals(hy) || "zh-hans".equals(hy)) {
+			return "zh_Hans";
+		}
+		if ("zh-tw".equals(hy) || "zh-hant".equals(hy) || "zh-hk".equals(hy)) {
+			return "zh_Hant";
 		}
 		return "en";
 	}
@@ -694,6 +823,34 @@ public class GlobalSettings implements Konstanten{
 
 	public static boolean isUiPortuguesePortugal() {
 		return "pt_PT".equals(uiLanguageTag);
+	}
+
+	public static boolean isUiSpanish() {
+		return "es".equals(uiLanguageTag);
+	}
+
+	public static boolean isUiFrench() {
+		return "fr".equals(uiLanguageTag);
+	}
+
+	public static boolean isUiItalian() {
+		return "it".equals(uiLanguageTag);
+	}
+
+	public static boolean isUiDutch() {
+		return "nl".equals(uiLanguageTag);
+	}
+
+	public static boolean isUiPolish() {
+		return "pl".equals(uiLanguageTag);
+	}
+
+	public static boolean isUiTurkish() {
+		return "tr".equals(uiLanguageTag);
+	}
+
+	public static boolean isUiRussian() {
+		return "ru".equals(uiLanguageTag);
 	}
 
 	public static double getSimulationPlayDelaySec() {
