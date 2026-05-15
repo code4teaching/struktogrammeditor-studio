@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 I18N_DIR = REPO_ROOT / "src/main/resources/de/visustruct/i18n"
 SOURCE = I18N_DIR / "Messages_en.properties"
 

@@ -30,3 +30,8 @@ com/
 
 # Lokaler Klon des SwiftUI-Repos (nicht ins Java-Projekt einchecken)
 VisuStruct-swift/
+
+# Lokale Python-Umgebung / Pakete für i18n-Skripte (tools/*.py)
+.venv-i18n/
+.pydeps/
+tools/.nl_pl_tr_ru_translations.json

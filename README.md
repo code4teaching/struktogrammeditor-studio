@@ -31,7 +31,7 @@ Full notes: [`release-notes/v1.2.2.md`](release-notes/v1.2.2.md).
 
 ## Changes in 1.2.1 (summary)
 
-- **Simulation:** **true/false** branch selection by case name; **reset (Stop)** for new input on rerun; highlight mode and play speed in Settings; sidebar layout (input always visible, current block shows instruction text).
+- **Simulation:** **true/false** branch selection by case name; **reset (Stop)** for new input on rerun; highlight mode and play speed under **Settings → Simulation…**; sidebar layout (input always visible, current block shows instruction text).
 - **Save:** pending **element-editor** text applied before save; more reliable save dialog on **macOS**.
 - **Code generator:** structure chart text as comments **off** by default.
 
@@ -240,8 +240,22 @@ Double-click may work if `.jar` is associated with Java.
 
 Suggestions and **bug reports** are welcome via [**Issues** and **Pull requests**](https://github.com/code4teaching/VisuStruct).
 
-**Commits** and **code comments** may use **English**.  
-New **visible UI strings** belong in **`Messages*.properties`** (and **`structure.*`** where applicable) for **en**, **de**, and **pt_PT**; open an issue first if keys or wording are unclear.
+**Commits** and **code comments** may use **English**.
+
+### UI strings (21 languages)
+
+- Bundles: `src/main/resources/de/visustruct/i18n/Messages_*.properties` (plus **`structure.*`** keys where applicable).
+- **Source of truth for new keys:** add the English string to **`Messages_en.properties`**, then extend the Swift↔Java map in the sibling repo **`VisuStruct-swift/tools/java_swift_i18n_map.json`** (clone next to this project; see `.gitignore`).
+- **Regenerate** all locale files from Swift where mapped (`tools/README.md`):
+
+  ```bash
+  python3 tools/sync_java_messages_from_swift.py
+  python3 tools/analyze_i18n_gaps.py   # optional: unmapped keys
+  ```
+
+  Unmapped keys keep the existing bundle text or fall back to English. Desktop-only dialogs may stay English until mapped.
+- **Menu language** is **Settings → Languages** only (`uilanguage` in `visustruct.properties`); do not duplicate a language list in other settings dialogs.
+- Open an issue first if keys, didactic wording, or Swift parity are unclear.
 
 ---
 

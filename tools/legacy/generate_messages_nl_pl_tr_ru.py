@@ -14,10 +14,10 @@ from pathlib import Path
 
 from missing_nl_pl_tr_ru_entries import MISSING_ENTRIES
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 I18N_DIR = REPO_ROOT / "src/main/resources/de/visustruct/i18n"
 SOURCE = I18N_DIR / "Messages_en.properties"
-JSON_DATA = Path(__file__).resolve().parent / ".nl_pl_tr_ru_translations.json"
+JSON_DATA = Path(__file__).resolve().parents[1] / ".nl_pl_tr_ru_translations.json"
 
 LOCALE_HEADERS = {
     "nl": "# Dutch",
