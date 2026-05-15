@@ -4,6 +4,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GraphicsEnvironment;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -166,15 +167,12 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 		addMouseMotionListener(this);
 
 
-		/*Drag & Drop aktivieren, siehe
-        http://www.java2s.com/Code/Java/Swing-JFC/MakingaComponentDraggable.htm
-        und
-        http://www.java2s.com/Code/Java/Swing-JFC/PanelDropTarget.htm
-		 */
-		dragSource = new DragSource();
-		dragSource.createDefaultDragGestureRecognizer(this, DnDConstants.ACTION_COPY_OR_MOVE, this);
-
-		new DropTarget(this, DnDConstants.ACTION_COPY_OR_MOVE, this, true, null);
+		/* Drag & Drop nur mit Display (GitHub CI / headless: Tests ohne X11). */
+		if (!GraphicsEnvironment.isHeadless()) {
+			dragSource = new DragSource();
+			dragSource.createDefaultDragGestureRecognizer(this, DnDConstants.ACTION_COPY_OR_MOVE, this);
+			new DropTarget(this, DnDConstants.ACTION_COPY_OR_MOVE, this, true, null);
+		}
 
 
 
@@ -1431,7 +1429,8 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 
 			dragZwischenlagerElement = (StruktogrammElement)dragZwischenlagerListe.gibElementAnPos(mausPos.x,mausPos.y,false);//das gezogene Element wird gespeichert
 
-			if ((dragZwischenlagerElement != null) && !(dragZwischenlagerElement instanceof LeerElement)){//wenn das Element nicht null ist und kein LeerElement ist...
+			if ((dragZwischenlagerElement != null) && !(dragZwischenlagerElement instanceof LeerElement)
+					&& dragSource != null) {//wenn das Element nicht null ist und kein LeerElement ist...
 				Transferable t = new StringSelection("z");//z für Element aus dem Zwischenlager
 
 				dragSource.startDrag(evt, DragSource.DefaultCopyDrop, t, this);//...wird ein Drag ausgelöst
