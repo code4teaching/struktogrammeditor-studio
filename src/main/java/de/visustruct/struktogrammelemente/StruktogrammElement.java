@@ -368,7 +368,11 @@ public abstract class StruktogrammElement { //abstrakte Klasse -> keine Objekte 
 			g.fillRect(gibX(), gibY(), gibBreite(), gibHoehe());
 			g.setColor(CanvasStyle.getElementBorder());
 			g.drawRect(gibX(), gibY(), gibBreite(), gibHoehe());
-			if (markiert) {
+			if (simulationSpotlight) {
+				g.setStroke(new BasicStroke(CanvasStyle.SELECTION_LINE_WIDTH));
+				g.setColor(CanvasStyle.getSelectionStroke());
+				g.drawRect(gibX(), gibY(), gibBreite(), gibHoehe());
+			} else if (markiert) {
 				g.setStroke(new BasicStroke(CanvasStyle.SELECTION_LINE_WIDTH));
 				g.setColor(CanvasStyle.getSelectionStroke());
 				g.drawRect(gibX(), gibY(), gibBreite(), gibHoehe());

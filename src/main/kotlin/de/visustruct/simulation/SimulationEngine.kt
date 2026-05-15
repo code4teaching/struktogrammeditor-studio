@@ -92,6 +92,21 @@ private fun stripTrailingSemicolon(text: String): String {
 }
 
 /**
+ * Verzweigung: XML-Fallreihenfolge kann von der visuellen „true/false“-Zuordnung abweichen
+ * (z. B. nach „Zweige vertauschen“ und Speichern ohne persistiertes Vertausch-Flag).
+ */
+internal fun branchCaseIndex(cases: List<SimulationCase>, result: Boolean): Int {
+    if (cases.size == 2) {
+        val trueIdx = cases.indexOfFirst { it.name.trim().equals("true", ignoreCase = true) }
+        val falseIdx = cases.indexOfFirst { it.name.trim().equals("false", ignoreCase = true) }
+        if (trueIdx >= 0 && falseIdx >= 0) {
+            return if (result) trueIdx else falseIdx
+        }
+    }
+    return if (result) 0 else 1
+}
+
+/**
  * Port von Swift `VisuStructSimulationEngine`: Schritt-für-Schritt-Ausführung eines
  * [SimulationDocument] (gleiche Konzepte wie iOS).
  */
@@ -119,11 +134,9 @@ constructor(document: SimulationDocument) {
         get() = state.inputRequest == null && state.stepIndex < stepsMutable.size
 
     fun reset(document: SimulationDocument? = null) {
-        document?.let {
-            sourceDocument = it
-            stepsMutable.clear()
-            stepsMutable.addAll(buildSteps(it.elements))
-        }
+        document?.let { sourceDocument = it }
+        stepsMutable.clear()
+        stepsMutable.addAll(buildSteps(sourceDocument.elements))
         state = SimulationState()
     }
 
@@ -237,7 +250,7 @@ constructor(document: SimulationDocument) {
         if (cases.size < 2) throw SimulationExprException("Unsupported statement: ${step.text}")
         val condition = stripConditionKeyword(step.text)
         val result = evaluateBoolExpression(condition)
-        val selectedCaseIndex = if (result) 0 else 1
+        val selectedCaseIndex = branchCaseIndex(cases, result)
         val branchSteps =
             buildSteps(cases[selectedCaseIndex].elements, step.path + selectedCaseIndex)
         stepsMutable.removeAt(state.stepIndex)

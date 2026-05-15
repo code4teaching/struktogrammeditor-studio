@@ -121,6 +121,13 @@ public class GlobalSettings implements Konstanten{
 	/** Textpaket für neu eingefügte Elemente (siehe {@link ElementBeschriftungPresets}). */
 	private static int elementBeschriftungPresetIndex = ElementBeschriftungPresets.PRESET_ENGLISH_JAVA;
 
+	/** Erlaubte Pausen (Sekunden) zwischen zwei Schritten bei Simulations-Wiedergabe. */
+	public static final double[] SIMULATION_PLAY_DELAY_SECONDS = { 0.2, 0.5, 0.75, 1.0, 1.5, 2.0 };
+
+	private static final double DEFAULT_SIMULATION_PLAY_DELAY_SEC = 0.5;
+
+	private static double simulationPlayDelaySec = DEFAULT_SIMULATION_PLAY_DELAY_SEC;
+
 	/**
 	 * Extended-Modifier-Maske für Menü-Kurzbefehle (Strg bzw. ⌘), z. B. für
 	 * {@link javax.swing.KeyStroke#getKeyStroke(int, int)} und {@code KeyEvent#getModifiersEx()}.
@@ -345,6 +352,15 @@ public class GlobalSettings implements Konstanten{
 			uiLanguageFromPropertiesFile = true;
 		}
 
+		s = pr.getProperty("simulationplaydelay");
+		if (s != null && !s.isBlank()) {
+			try {
+				setSimulationPlayDelaySec(Double.parseDouble(s.trim()));
+			} catch (NumberFormatException ignored) {
+				simulationPlayDelaySec = DEFAULT_SIMULATION_PLAY_DELAY_SEC;
+			}
+		}
+
 		recentDiagramPaths.clear();
 		for (int i = 0; i < MAX_RECENT_DIAGRAM_FILES; i++) {
 			s = pr.getProperty("recentdiagram" + i);
@@ -395,6 +411,8 @@ public class GlobalSettings implements Konstanten{
 		properties.setProperty("elementlabelpreset", "" + elementBeschriftungPresetIndex);
 
 		properties.setProperty("uilanguage", uiLanguageTag);
+
+		properties.setProperty("simulationplaydelay", Double.toString(simulationPlayDelaySec));
 
 		for (int i = 0; i < MAX_RECENT_DIAGRAM_FILES; i++) {
 			if (i < recentDiagramPaths.size()) {
@@ -660,5 +678,32 @@ public class GlobalSettings implements Konstanten{
 
 	public static boolean isUiPortuguesePortugal() {
 		return "pt_PT".equals(uiLanguageTag);
+	}
+
+	public static double getSimulationPlayDelaySec() {
+		return simulationPlayDelaySec;
+	}
+
+	public static int getSimulationPlayDelayMs() {
+		return Math.max(50, (int) Math.round(simulationPlayDelaySec * 1000.0));
+	}
+
+	public static void setSimulationPlayDelaySec(double seconds) {
+		for (double opt : SIMULATION_PLAY_DELAY_SECONDS) {
+			if (Math.abs(opt - seconds) < 1e-9) {
+				simulationPlayDelaySec = opt;
+				return;
+			}
+		}
+		simulationPlayDelaySec = DEFAULT_SIMULATION_PLAY_DELAY_SEC;
+	}
+
+	public static int getSimulationPlayDelayIndex() {
+		for (int i = 0; i < SIMULATION_PLAY_DELAY_SECONDS.length; i++) {
+			if (Math.abs(SIMULATION_PLAY_DELAY_SECONDS[i] - simulationPlayDelaySec) < 1e-9) {
+				return i;
+			}
+		}
+		return 1;
 	}
 }

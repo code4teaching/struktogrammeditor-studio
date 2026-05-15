@@ -22,6 +22,13 @@ git clone https://github.com/code4teaching/VisuStruct.git
 
 ---
 
+## Changes in 1.2.1 (summary)
+
+- **Simulation:** correct **true/false** branch selection after swapped branches; **reset (Stop)** rebuilds the step list and accepts a **new input** on rerun.
+- **Save:** pending **element-editor** text is applied before save; more reliable save dialog on **macOS**.
+
+Full notes: [`release-notes/v1.2.1.md`](release-notes/v1.2.1.md).
+
 ## Changes in 1.2.0 (summary)
 
 - **Simulation (prep):** **Kotlin** in the Maven build; **`SimulationDocument`** and related types plus **XML decode** aligned with the existing diagram file format; **`Struktogramm.toSimulationDocument()`** exports the current editor state for a future **`step()`** engine (no simulation UI yet).
@@ -133,7 +140,7 @@ This release aligns **branding and technical identity** with **VisuStruct**. **`
 - **Java 17** target (build and run with JDK 17+).
 - **FlatLaf** light/dark themes; **JDOM2**; no legacy AppleJavaExtensions.
 - **Motif** look-and-feel removed; **Metal** and FlatLaf available.
-- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.2.0.jar`**).
+- Current fat JAR name follows **`pom.xml`** **`version`** (e.g. **`visustruct-1.2.1.jar`**).
 
 ---
 
@@ -208,13 +215,13 @@ chmod +x mvnw
 Output (version from `pom.xml`):
 
 ```text
-target/visustruct-1.2.0.jar
+target/visustruct-1.2.1.jar
 ```
 
 ## Run
 
 ```bash
-java -jar target/visustruct-1.2.0.jar
+java -jar target/visustruct-1.2.1.jar
 ```
 
 Double-click may work if `.jar` is associated with Java.

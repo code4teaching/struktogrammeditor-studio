@@ -230,6 +230,14 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 	 * oder {@code null} bei ungültigem Pfad.
 	 */
 	public StruktogrammElement elementFuerSimulationPfadSuchen(List<Integer> path) {
+		return elementFuerSimulationPfadSuchenExakt(path);
+	}
+
+	/**
+	 * Liefert das Element zum exakten Pfad oder zum längsten gültigen Präfix
+	 * (falls der Engine-Pfad einen Schleifen-Inhalts-Marker o. Ä. enthält).
+	 */
+	public StruktogrammElement elementFuerSimulationPfadSuchenExakt(List<Integer> path) {
 		if (path == null || path.isEmpty()) {
 			return null;
 		}
@@ -251,9 +259,26 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 				}
 				list = fa.gibListe(col);
 			} else if (el instanceof Schleife sch) {
+				// Wie SimulationEngine.buildSteps(..., pathPrefix + 0): nach Schleifenindex folgt 0 = Inhalt.
+				if (pi < path.size()) {
+					pi++;
+				}
 				list = sch.gibListe();
 			} else {
 				return null;
+			}
+		}
+		return null;
+	}
+
+	private StruktogrammElement elementFuerSimulationPfadSuchenMitFallback(List<Integer> path) {
+		if (path == null || path.isEmpty()) {
+			return null;
+		}
+		for (int len = path.size(); len > 0; len--) {
+			StruktogrammElement el = elementFuerSimulationPfadSuchenExakt(path.subList(0, len));
+			if (el != null) {
+				return el;
 			}
 		}
 		return null;
@@ -269,7 +294,7 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 			zeichne();
 			return;
 		}
-		StruktogrammElement el = elementFuerSimulationPfadSuchen(path);
+		StruktogrammElement el = elementFuerSimulationPfadSuchenMitFallback(path);
 		if (el != null) {
 			el.setzeSimulationSpotlight(true);
 			simulationSpotlightElement = el;
@@ -1271,10 +1296,15 @@ public class Struktogramm extends JPanel implements MouseListener, MouseMotionLi
 			return;
 		}
 		try {
+			File ziel = new File(pfad);
+			File eltern = ziel.getParentFile();
+			if (eltern != null && !eltern.isDirectory() && !eltern.mkdirs()) {
+				throw new IOException("Verzeichnis konnte nicht angelegt werden: " + eltern.getAbsolutePath());
+			}
 			Document myDocument = xmlErstellen();
 			XMLOutputter outputter = new XMLOutputter();
 			outputter.setFormat(Format.getPrettyFormat());
-			try (Writer writer = new OutputStreamWriter(new FileOutputStream(pfad), StandardCharsets.UTF_8)) {
+			try (Writer writer = new OutputStreamWriter(new FileOutputStream(ziel), StandardCharsets.UTF_8)) {
 				outputter.output(myDocument, writer);
 			}
 			tabbedpane.titelFuerStruktogrammBearbeitetMarkieren(this, false);

@@ -1,22 +1,27 @@
 package de.visustruct.view;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Toolkit;
+import java.text.NumberFormat;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.ListCellRenderer;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
@@ -30,12 +35,13 @@ public class EinstellungsDialog extends JDialog {
 	public static final int anzahlStruktogrammElemente = 10;
 
 	private final GUI hostGui;
+	private final JComboBox<Double> simulationSpeedCombo;
 
 	public EinstellungsDialog(GUI gui, boolean modal) {
 		super(gui, I18n.tr("dialog.elementText.title"), modal);
 		hostGui = gui;
 		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-		setSize(500, 480);
+		setSize(500, 540);
 		Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
 		setLocation((d.width - getSize().width) / 2, (d.height - getSize().height) / 2);
 		setLayout(new BorderLayout(10, 10));
@@ -43,6 +49,18 @@ public class EinstellungsDialog extends JDialog {
 		JLabel kopf = new JLabel("<html><div style='width:420px'>" + I18n.tr("dialog.elementText.intro") + "</div></html>");
 		kopf.setBorder(BorderFactory.createEmptyBorder(4, 8, 0, 8));
 		add(kopf, BorderLayout.NORTH);
+
+		simulationSpeedCombo = new JComboBox<>();
+		for (double sec : GlobalSettings.SIMULATION_PLAY_DELAY_SECONDS) {
+			simulationSpeedCombo.addItem(sec);
+		}
+		simulationSpeedCombo.setRenderer(new SimulationSpeedListRenderer());
+		simulationSpeedCombo.setSelectedIndex(GlobalSettings.getSimulationPlayDelayIndex());
+
+		JPanel simulationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+		simulationPanel.setBorder(BorderFactory.createTitledBorder(I18n.tr("dialog.elementText.simulationSection")));
+		simulationPanel.add(new JLabel(I18n.tr("dialog.elementText.simulationSpeedLabel")));
+		simulationPanel.add(simulationSpeedCombo);
 
 		int startIdx = GlobalSettings.getElementBeschriftungPresetIndex();
 		if (startIdx < 0 || startIdx >= ElementBeschriftungPresets.ANZAHL_PRESETS) {
@@ -95,37 +113,74 @@ public class EinstellungsDialog extends JDialog {
 
 		JPanel mitte = new JPanel(new BorderLayout(0, 8));
 		mitte.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 8));
-		mitte.add(radioPanel, BorderLayout.NORTH);
-		mitte.add(scroll, BorderLayout.CENTER);
+		mitte.add(simulationPanel, BorderLayout.NORTH);
+		mitte.add(radioPanel, BorderLayout.CENTER);
+		mitte.add(scroll, BorderLayout.SOUTH);
 		add(mitte, BorderLayout.CENTER);
 
 		JPanel unten = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
 		JButton abbrechen = new JButton(I18n.tr("dialog.elementText.cancel"));
 		abbrechen.addActionListener(e -> setVisible(false));
 		JButton ok = new JButton(I18n.tr("dialog.elementText.ok"));
-		ok.addActionListener(e -> {
-			int sel = ElementBeschriftungPresets.PRESET_ENGLISH_JAVA;
-			for (int u = 0; u < radios.length; u++) {
-				if (radios[u].isSelected()) {
-					sel = ElementBeschriftungPresets.presetIndexAtDialogPlatz(u);
-					break;
-				}
-			}
-			GlobalSettings.wendeElementBeschriftungsPresetAn(sel);
-			GlobalSettings.saveSettings();
-			SwingUtilities.invokeLater(() -> {
-				hostGui.rebuildMenuBar();
-				hostGui.gibAuswahlPanel().aktualisiereBeschriftungen();
-				hostGui.gibAuswahlPanel().revalidate();
-				hostGui.gibAuswahlPanel().repaint();
-				SwingUtilities.invokeLater(() -> hostGui.gibAuswahlPanel().aktualisiereBeschriftungen());
-			});
-			setVisible(false);
-		});
+		ok.addActionListener(e -> applyAndClose(radios));
 		unten.add(abbrechen);
 		unten.add(ok);
 		add(unten, BorderLayout.SOUTH);
 
 		setVisible(true);
+	}
+
+	private void applyAndClose(JRadioButton[] radios) {
+		Double speed = (Double) simulationSpeedCombo.getSelectedItem();
+		if (speed != null) {
+			GlobalSettings.setSimulationPlayDelaySec(speed);
+		}
+		int sel = ElementBeschriftungPresets.PRESET_ENGLISH_JAVA;
+		for (int u = 0; u < radios.length; u++) {
+			if (radios[u].isSelected()) {
+				sel = ElementBeschriftungPresets.presetIndexAtDialogPlatz(u);
+				break;
+			}
+		}
+		GlobalSettings.wendeElementBeschriftungsPresetAn(sel);
+		GlobalSettings.saveSettings();
+		SwingUtilities.invokeLater(() -> {
+			hostGui.rebuildMenuBar();
+			hostGui.gibAuswahlPanel().aktualisiereBeschriftungen();
+			hostGui.gibAuswahlPanel().revalidate();
+			hostGui.gibAuswahlPanel().repaint();
+			SwingUtilities.invokeLater(() -> hostGui.gibAuswahlPanel().aktualisiereBeschriftungen());
+		});
+		setVisible(false);
+	}
+
+	static String formatSimulationSpeedLabel(double seconds) {
+		NumberFormat nf = NumberFormat.getNumberInstance(GlobalSettings.getUiLocale());
+		nf.setMaximumFractionDigits(2);
+		nf.setMinimumFractionDigits(0);
+		return nf.format(seconds) + " " + I18n.tr("dialog.elementText.simulationSpeedUnit");
+	}
+
+	private static final class SimulationSpeedListRenderer extends JLabel implements ListCellRenderer<Double> {
+
+		private static final long serialVersionUID = 1L;
+
+		SimulationSpeedListRenderer() {
+			setOpaque(true);
+		}
+
+		@Override
+		public Component getListCellRendererComponent(JList<? extends Double> list, Double value, int index,
+				boolean isSelected, boolean cellHasFocus) {
+			if (isSelected) {
+				setBackground(list.getSelectionBackground());
+				setForeground(list.getSelectionForeground());
+			} else {
+				setBackground(list.getBackground());
+				setForeground(list.getForeground());
+			}
+			setText(value == null ? "" : formatSimulationSpeedLabel(value));
+			return this;
+		}
 	}
 }

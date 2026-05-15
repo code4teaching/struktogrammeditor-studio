@@ -36,6 +36,7 @@ sealed class SimulationValue {
         when (this) {
             is VInt -> value.toDouble()
             is VDouble -> value
+            is VString -> value.toDoubleOrNull() ?: Double.NaN
             else -> Double.NaN
         }
 

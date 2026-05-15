@@ -4,7 +4,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-VER="${PROJECT_VERSION:-1.2.0}"
+VER="${PROJECT_VERSION:-1.2.1}"
 JAR_NAME="visustruct-${VER}.jar"
 OUT="${ROOT}/dist/macos-app-light"
 APP="${OUT}/VisuStruct.app"

@@ -15,6 +15,9 @@ private data class ArrayDecl(val name: String, val typeName: String, val count: 
 
 private data class ArrayAccess(val arrayName: String, val indexExpression: String)
 
+/** Wie {@code CodeGenRules} / Editor: {@code output: …} oder {@code print: …}. */
+private val OUTPUT_PREFIX_PATTERN = Regex("(?i)^\\s*(?:output|print):\\s*(.*)$")
+
 internal fun SimulationEngine.executeStatement(rawText: String) {
     val text = rawText.trim()
     if (text.lowercase().startsWith("input:")) {
@@ -22,10 +25,16 @@ internal fun SimulationEngine.executeStatement(rawText: String) {
         state.inputError = null
         return
     }
-    val lower = text.lowercase()
-    if (lower.startsWith("output:") || lower.startsWith("print:")) {
-        val prefixLen = if (lower.startsWith("output:")) 7 else 6
-        val expression = text.drop(prefixLen)
+    normalizeOutputLikeStatement(text)?.let { normalized ->
+        executeStatement(normalized)
+        return
+    }
+    val outputMatch = OUTPUT_PREFIX_PATTERN.matchEntire(text)
+    if (outputMatch != null) {
+        val expression = stripTrailingSemicolon(outputMatch.groupValues[1].trim())
+        if (expression.isEmpty()) {
+            throw SimulationExprException("Output expression is empty.")
+        }
         val rendered = renderOutputExpression(expression)
         val output = evaluateOutputExpression(expression)
         state.outputLines.add(output)
@@ -38,11 +47,6 @@ internal fun SimulationEngine.executeStatement(rawText: String) {
     }
     val eq = text.indexOf('=')
     if (eq < 0) {
-        val consoleInner = extractConsoleLogArgument(text)
-        if (consoleInner != null) {
-            executeStatement("print: $consoleInner")
-            return
-        }
         executeBareExpressionStatement(text)
         return
     }
@@ -159,10 +163,42 @@ private fun SimulationEngine.executeBareExpressionStatement(text: String) {
     state.lastTrace = "$text -> ${v.display} (no assignment)"
 }
 
+/** `output:`, `print:`, `System.out.println(…)`, `console.log(…)`, Python `print(…)`. */
+private fun normalizeOutputLikeStatement(text: String): String? {
+    extractSystemOutPrintlnArgument(text)?.let { return "output: $it" }
+    extractConsoleLogArgument(text)?.let { return "print: $it" }
+    extractPythonPrintArgument(text)?.let { return "output: $it" }
+    return null
+}
+
+private fun stripTrailingSemicolon(text: String): String {
+    var result = text.trim()
+    while (result.endsWith(';')) {
+        result = result.dropLast(1).trim()
+    }
+    return result
+}
+
 /** Einfaches `console.log(a + b)` → wie `print:`. */
 private fun extractConsoleLogArgument(text: String): String? {
     val m =
-        Regex("^console\\.log\\s*\\((.+)\\)\\s*$", RegexOption.IGNORE_CASE).find(text.trim())
+        Regex("^console\\.log\\s*\\((.+)\\)\\s*;?\\s*$", RegexOption.IGNORE_CASE).find(text.trim())
+            ?: return null
+    return m.groupValues[1].trim()
+}
+
+/** Wie vom Java-Codegenerator erzeugte Ausgabezeilen im Diagramm. */
+private fun extractSystemOutPrintlnArgument(text: String): String? {
+    val m =
+        Regex("^System\\.out\\.println\\s*\\((.+)\\)\\s*;?\\s*$", RegexOption.IGNORE_CASE)
+            .find(text.trim()) ?: return null
+    return m.groupValues[1].trim()
+}
+
+/** Python-ähnliche Ausgabe im Block. */
+private fun extractPythonPrintArgument(text: String): String? {
+    val m =
+        Regex("^print\\s*\\((.+)\\)\\s*;?\\s*$", RegexOption.IGNORE_CASE).find(text.trim())
             ?: return null
     return m.groupValues[1].trim()
 }

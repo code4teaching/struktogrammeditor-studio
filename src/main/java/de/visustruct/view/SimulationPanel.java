@@ -24,6 +24,7 @@ import javax.swing.Timer;
 import javax.swing.UIManager;
 
 import de.visustruct.control.Controlling;
+import de.visustruct.control.GlobalSettings;
 import de.visustruct.control.Struktogramm;
 import de.visustruct.i18n.I18n;
 import de.visustruct.simulation.SimulationEngine;
@@ -36,14 +37,10 @@ public class SimulationPanel extends JPanel {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final int PLAY_INTERVAL_MS = 220;
-	/** Pro Timer-Tick: mehrere Simulationsschritte, damit die Wiedergabe flüssiger wirkt (ohne Eingabe). */
-	private static final int PLAY_STEPS_PER_TICK = 16;
-
 	/** Mediensymbole (an SF Symbols / Swift-Steuerung angelehnt). */
 	private static final String SYM_PLAY = "\u25B6";
 	private static final String SYM_PAUSE = "\u23F8";
-	private static final String SYM_STEP = "\u23ED";
+	private static final String SYM_STEP = "\u2192";
 	private static final String SYM_STOP = "\u23F9";
 	private static final String SYM_BACK = "\u2190";
 	private static final String SYM_SUBMIT = "\u2713";
@@ -71,6 +68,8 @@ public class SimulationPanel extends JPanel {
 
 	private final Timer playTimer;
 	private boolean playing;
+	/** Wiedergabe nach erfolgreicher Eingabe fortsetzen (war vor input: aktiv). */
+	private boolean resumePlayAfterInput;
 	private JPanel controlsNorthPanel;
 	private JPanel inputSectionPanel;
 
@@ -88,7 +87,7 @@ public class SimulationPanel extends JPanel {
 		variablesArea.setEditable(false);
 		outputArea.setEditable(false);
 
-		playTimer = new Timer(PLAY_INTERVAL_MS, e -> onPlayTick());
+		playTimer = new Timer(GlobalSettings.getSimulationPlayDelayMs(), e -> onPlayTick());
 		playTimer.setRepeats(true);
 
 		playButton.addActionListener(e -> onPlay());
@@ -108,7 +107,7 @@ public class SimulationPanel extends JPanel {
 		ButtonGroup highlightGroup = new ButtonGroup();
 		highlightGroup.add(highlightNextRadio);
 		highlightGroup.add(highlightLastRadio);
-		highlightNextRadio.setSelected(true);
+		highlightLastRadio.setSelected(true);
 		var highlightListener = (java.awt.event.ItemListener) e -> {
 			if (e.getStateChange() == ItemEvent.SELECTED) {
 				applyDiagramHighlight();
@@ -173,6 +172,34 @@ public class SimulationPanel extends JPanel {
 			return null;
 		}
 		return new ArrayList<>(path);
+	}
+
+	/**
+	 * Nach Verzweigung/Schleife: Engine ersetzt einen Kopf-Schritt durch Unter-Schritte —
+	 * der Pfad wird länger (z. B. [1] → [1,0,0]). Dann ersten Schritt im Zweig markieren.
+	 */
+	private static boolean isStrictPathExtension(List<Integer> before, List<Integer> after) {
+		if (before == null || after == null || after.size() <= before.size()) {
+			return false;
+		}
+		for (int i = 0; i < before.size(); i++) {
+			if (!before.get(i).equals(after.get(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private void recordStepHighlightPath(List<Integer> pathBeforeStep) {
+		if (engine == null) {
+			return;
+		}
+		List<Integer> after = copyPath(engine.getCurrentStepPath());
+		if (isStrictPathExtension(pathBeforeStep, after)) {
+			lastExecutedSimulationPath = after;
+		} else {
+			lastExecutedSimulationPath = pathBeforeStep;
+		}
 	}
 
 	private void applyTransportLabelsAndTips() {
@@ -247,19 +274,36 @@ public class SimulationPanel extends JPanel {
 			str.setzeSimulationSpotlightPfad(null);
 			return;
 		}
-		List<Integer> p;
-		if (highlightNextRadio.isSelected()) {
-			p = copyPath(engine.getCurrentStepPath());
-			boolean simAmEnde =
-				engine.getInputRequestForUi() == null && !engine.getCanStep();
-			if ((p == null || p.isEmpty()) && simAmEnde && lastExecutedSimulationPath != null) {
-				// Kein „nächster“ Block mehr: letzte ausgeführte Position bis Stopp sichtbar lassen
-				p = copyPath(lastExecutedSimulationPath);
-			}
-		} else {
-			p = copyPath(lastExecutedSimulationPath);
-		}
+		List<Integer> p = resolveHighlightPath();
 		str.setzeSimulationSpotlightPfad(p);
+	}
+
+	/** Pfad für die Diagramm-Markierung (je nach Radio „nächster“ / „letzter“ Schritt). */
+	private List<Integer> resolveHighlightPath() {
+		if (engine == null) {
+			return null;
+		}
+		List<Integer> current = copyPath(engine.getCurrentStepPath());
+		boolean simAmEnde = engine.getInputRequestForUi() == null && !engine.getCanStep();
+
+		if (highlightNextRadio.isSelected()) {
+			if (current != null && !current.isEmpty()) {
+				return current;
+			}
+			if (simAmEnde && lastExecutedSimulationPath != null) {
+				return copyPath(lastExecutedSimulationPath);
+			}
+			return null;
+		}
+
+		List<Integer> last = copyPath(lastExecutedSimulationPath);
+		if (last != null && !last.isEmpty()) {
+			return last;
+		}
+		if (!simAmEnde && current != null && !current.isEmpty()) {
+			return current;
+		}
+		return null;
 	}
 
 	@Override
@@ -273,6 +317,7 @@ public class SimulationPanel extends JPanel {
 
 	public void setEngine(SimulationEngine eng) {
 		stopPlayInternal();
+		resumePlayAfterInput = false;
 		lastExecutedSimulationPath = null;
 		this.engine = eng;
 		refreshFromEngine();
@@ -280,6 +325,7 @@ public class SimulationPanel extends JPanel {
 
 	public void clearEngine() {
 		stopPlayInternal();
+		resumePlayAfterInput = false;
 		this.engine = null;
 		lastExecutedSimulationPath = null;
 		clearDiagramSimulationHighlight();
@@ -310,7 +356,11 @@ public class SimulationPanel extends JPanel {
 		for (String line : engine.getOutputLinesSnapshot()) {
 			out.append(line).append('\n');
 		}
-		outputArea.setText(out.toString());
+		String outText = out.toString();
+		outputArea.setText(outText);
+		if (!outText.isEmpty()) {
+			outputArea.setCaretPosition(outText.length());
+		}
 
 		String msg = engine.getUiMessage();
 		messageLabel.setText(msg != null && !msg.isEmpty() ? msg : " ");
@@ -334,6 +384,9 @@ public class SimulationPanel extends JPanel {
 		SimulationInputRequest req = engine.getInputRequestForUi();
 		String err = engine.getInputErrorForUi();
 		if (req != null) {
+			if (playing) {
+				resumePlayAfterInput = true;
+			}
 			stopPlayInternal();
 			inputPromptLabel.setText(req.getPrompt());
 			inputField.setEnabled(true);
@@ -371,12 +424,14 @@ public class SimulationPanel extends JPanel {
 		if (engine == null || !engine.getCanStep()) {
 			return;
 		}
+		playTimer.setDelay(GlobalSettings.getSimulationPlayDelayMs());
 		playing = true;
 		playTimer.start();
 		updateTransportButtons();
 	}
 
 	private void onPause() {
+		resumePlayAfterInput = false;
 		stopPlayInternal();
 		updateTransportButtons();
 	}
@@ -390,19 +445,10 @@ public class SimulationPanel extends JPanel {
 			refreshFromEngine();
 			return;
 		}
-		int burst = 0;
-		while (burst < PLAY_STEPS_PER_TICK && engine != null && playing && engine.getCanStep()) {
-			List<Integer> before = copyPath(engine.getCurrentStepPath());
-			engine.step();
-			lastExecutedSimulationPath = before;
-			burst++;
-			if (engine.getInputRequestForUi() != null) {
-				break;
-			}
-		}
-		if (burst > 0) {
-			refreshFromEngine();
-		}
+		List<Integer> before = copyPath(engine.getCurrentStepPath());
+		engine.step();
+		recordStepHighlightPath(before);
+		refreshFromEngine();
 		if (engine != null && engine.getInputRequestForUi() != null) {
 			stopPlayInternal();
 			updateTransportButtons();
@@ -416,6 +462,7 @@ public class SimulationPanel extends JPanel {
 		if (engine == null) {
 			return;
 		}
+		resumePlayAfterInput = false;
 		stopPlayInternal();
 		if (!engine.getCanStep()) {
 			updateTransportButtons();
@@ -424,7 +471,7 @@ public class SimulationPanel extends JPanel {
 		}
 		List<Integer> before = copyPath(engine.getCurrentStepPath());
 		engine.step();
-		lastExecutedSimulationPath = before;
+		recordStepHighlightPath(before);
 		refreshFromEngine();
 	}
 
@@ -432,9 +479,11 @@ public class SimulationPanel extends JPanel {
 		if (engine == null) {
 			return;
 		}
+		resumePlayAfterInput = false;
 		stopPlayInternal();
 		lastExecutedSimulationPath = null;
 		engine.reset(null);
+		inputField.setText("");
 		refreshFromEngine();
 	}
 
@@ -442,11 +491,16 @@ public class SimulationPanel extends JPanel {
 		if (engine == null || !inputField.isEnabled()) {
 			return;
 		}
+		boolean shouldResumePlay = resumePlayAfterInput;
 		List<Integer> before = copyPath(engine.getCurrentStepPath());
 		engine.provideInput(inputField.getText());
 		inputField.setText("");
-		lastExecutedSimulationPath = before;
+		recordStepHighlightPath(before);
 		refreshFromEngine();
+		if (shouldResumePlay && engine != null && engine.getInputRequestForUi() == null && engine.getCanStep()) {
+			resumePlayAfterInput = false;
+			onPlay();
+		}
 	}
 
 	/** Menü-Sprache wechseln: Texte neu setzen. */

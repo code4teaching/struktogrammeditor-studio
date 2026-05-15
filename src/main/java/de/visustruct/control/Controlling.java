@@ -212,9 +212,13 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 
 	public void speichern(boolean neuenSpeicherpfadAuswaehlenLassen){
 		Struktogramm str = gibAktuellesStruktogramm();
-
-		if(str != null){
-			GlobalSettings.setzeSpeicherpfad(str.speichern(neuenSpeicherpfadAuswaehlenLassen,GlobalSettings.getZuletztGenutzterSpeicherpfad()));//Struktogramm wird gespeichert (zuletztGenutzterSpeicherpfad wird dabei übergeben, damit der JFileChooser, sofern er genutzt wird, dort startet) und der neue Speicherpfad wird gesichert
+		if (str == null) {
+			return;
+		}
+		flushPendingDiagramEdits();
+		Runnable saveTask = () -> {
+			GlobalSettings.setzeSpeicherpfad(str.speichern(neuenSpeicherpfadAuswaehlenLassen,
+					GlobalSettings.getZuletztGenutzterSpeicherpfad()));
 			String p = str.gibAktuellenSpeicherpfad();
 			if (!p.isEmpty()) {
 				GlobalSettings.rememberRecentStruktogrammPath(p);
@@ -222,7 +226,18 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 			GlobalSettings.saveSettings();
 			titelleisteAktualisieren();
 			gui.rebuildMenuBar();
+		};
+		// macOS: Speicherdialog nach Modal (z. B. Tab umbenennen) erst im nächsten EDT-Takt
+		if (neuenSpeicherpfadAuswaehlenLassen || str.gibAktuellenSpeicherpfad().isEmpty()) {
+			SwingUtilities.invokeLater(saveTask);
+		} else {
+			saveTask.run();
 		}
+	}
+
+	/** Editor-Text ins Diagramm übernehmen (wie vor Simulation), damit Speichern den sichtbaren Stand schreibt. */
+	private void flushPendingDiagramEdits() {
+		gui.gibElementEditorPanel().applyPendingTextToDiagram();
 	}
 
 	public void laden(){
@@ -371,6 +386,7 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 			break;
 
 		case quellcodeErzeugen:
+			flushPendingDiagramEdits();
 			new CodeErzeuger(gui, I18n.tr("menu.file.generateCode"), true, gibAktuellesStruktogramm());
 			break;
 
@@ -623,7 +639,7 @@ public class Controlling implements Konstanten, ActionListener, WindowListener, 
 		if (gui.gibTabbedpane().getTabCount() <= 0) {
 			return;
 		}
-		gui.gibElementEditorPanel().applyPendingTextToDiagram();
+		flushPendingDiagramEdits();
 		Struktogramm str = gibAktuellesStruktogramm();
 		if (str == null) {
 			return;
