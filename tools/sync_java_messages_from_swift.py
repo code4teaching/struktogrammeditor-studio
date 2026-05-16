@@ -15,7 +15,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SWIFT_ROOT = REPO_ROOT.parent / "VisuStruct-swift"
-MAP_PATH = SWIFT_ROOT / "tools" / "java_swift_i18n_map.json"
+MAP_CANDIDATES = (
+    SWIFT_ROOT / "tools" / "java_swift_i18n_map.json",
+    REPO_ROOT / "tools" / "java_swift_i18n_map.json",
+)
 JAVA_I18N = REPO_ROOT / "src/main/resources/de/visustruct/i18n"
 SWIFT_VISU = SWIFT_ROOT / "VisuStruct-iOS" / "VisuStructXcodeOpen" / "VisuStruct"
 SOURCE = JAVA_I18N / "Messages_en.properties"
@@ -210,11 +213,33 @@ def patch_bundle_menu_keys(path: Path, labels: dict[str, str]) -> None:
     path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
 
+def resolve_map_path() -> Path | None:
+    for path in MAP_CANDIDATES:
+        if path.is_file():
+            return path
+    return None
+
+
 def main() -> int:
-    if not MAP_PATH.is_file():
-        print(f"Map not found: {MAP_PATH}", file=sys.stderr)
+    map_path = resolve_map_path()
+    if map_path is None:
+        print(
+            "Map not found. Expected one of:\n"
+            + "\n".join(f"  - {p}" for p in MAP_CANDIDATES)
+            + "\nClone VisuStruct-swift next to this repo, or run:\n"
+            "  python3 tools/resync_message_bundles.py",
+            file=sys.stderr,
+        )
         return 1
-    cfg = json.loads(MAP_PATH.read_text(encoding="utf-8"))
+    if not SWIFT_ROOT.is_dir():
+        print(
+            f"VisuStruct-swift not found at {SWIFT_ROOT}\n"
+            "Clone the iOS repo as a sibling, then re-run this script.\n"
+            "Until then: python3 tools/resync_message_bundles.py",
+            file=sys.stderr,
+        )
+        return 1
+    cfg = json.loads(map_path.read_text(encoding="utf-8"))
     source_lines = SOURCE.read_text(encoding="utf-8").splitlines()
     targets = cfg.get("javaTargetLocales", {})
 
